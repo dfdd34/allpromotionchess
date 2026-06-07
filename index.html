@@ -10,9 +10,10 @@
     #connection{margin-bottom:8px}
     #connection input{padding:4px 6px;font-size:1rem;width:110px}
     #connection button{padding:4px 10px;margin-left:4px;font-size:1rem;cursor:pointer}
-    #status{display:inline-block;width:10px;height:10px;margin-left:8px;border-radius:50%;background:#ccc;vertical-align:middle}
-    #status.online{background:#2ecc71}
-    #status.offline{background:#e74c3c}
+    #statusDot{display:inline-block;width:10px;height:10px;margin-left:4px;border-radius:50%;background:#ccc;vertical-align:middle}
+    #statusDot.online{background:#2ecc71}
+    #statusDot.offline{background:#e74c3c}
+    #info{margin:6px 0;font-size:.9rem;color:#666;height:18px}
     canvas{background:#fff;border:2px solid #333;touch-action:none}
     /* 승급 모달 */
     #promo{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -32,8 +33,9 @@
     </label>
     <button id="create">방 만들기</button>
     <button id="join">입장</button>
-    <span id="status" class="offline"></span>
+    <span id="statusDot" class="offline"></span>
 </div>
+<div id="info"></div>
 
 <canvas id="board" width="480" height="480"></canvas>
 
@@ -50,21 +52,21 @@
 
 <script>
 /* ======================= 설정 ======================= */
-const WS_URL = "wss://allpromotionchess.onrender.com";    // ← 실제 Render WebSocket 엔드포인트로 교체하세요
+const WS_URL = "wss://allpromotionchess.onrender.com";    // 실제 Render WebSocket 주소로 교체
 const TILE   = 60;                                      // 한 칸 60px (8*60=480)
 /* ===================== 유틸 함수 ===================== */
-function $(id){return document.getElementById(id);}
-function send(ws,obj){ws.readyState===1&&ws.send(JSON.stringify(obj));}
-function status(on){$("status").className = on ? "online" : "offline";}
-/* ============== 체스 엔진 (경량/자체 구현) ============== */
+const $ = id => document.getElementById(id);
+const send = (ws,obj)=> ws.readyState===1 && ws.send(JSON.stringify(obj));
+const setDot = on => $("statusDot").className = on ? "online" : "offline";
+const logInfo = txt => $("info").textContent = txt||"";
+/* ============== 체스 엔진 (경량) ============== */
+/* …―――― (엔진 클래스는 이전과 동일, 하단에 그대로 배치) ――――… */
+/* ↓↓↓ 여기부터 엔진 코드 전문 ↓↓↓ */
 class Chess{
     constructor(fen=Chess.START_FEN){this.load(fen);}
-    /* ------------ FEN 파싱/직렬화 ------------ */
     load(fen){
-        const parts=fen.trim().split(/\s+/);
-        if(parts.length<2)throw Error("잘못된 FEN");
+        const [rows,turn] = fen.trim().split(/\s+/);
         this.board=[...Array(8)].map(()=>Array(8).fill(null));
-        let [rows,turn]=parts;
         rows.split("/").forEach((row,y)=>{
             let x=0;
             for(const c of row){
@@ -76,208 +78,161 @@ class Chess{
     }
     fen(){
         const rows=this.board.map(r=>{
-            let s="",cnt=0;
+            let s="",n=0;
             r.forEach(p=>{
-                if(!p)cnt++;
-                else{ if(cnt){s+=cnt;cnt=0;} s+=p;}
+                if(!p) n++;
+                else{ if(n){s+=n;n=0;} s+=p;}
             });
-            return cnt?s+cnt:s;
+            return n?s+n:s;
         }).join("/");
         return `${rows} ${this.turn}`;
     }
-    /* ------------ 내부 헬퍼 ------------ */
-    inBounds(x,y){return x>=0&&x<8&&y>=0&&y<8;}
-    pieceColor(p){return p===p?.toUpperCase()?"w":"b";}
-    dir(a){return a==="w"?-1:1;}          // 폰 진행 방향
-    isBackRank(y,color){return color==="w"?y===0:y===7;}
-    cloneBoard(){return this.board.map(r=>r.slice());}
-    /* ------------ 이동 유효성 검사 ------------ */
+    in(x,y){return x>=0&&x<8&&y>=0&&y<8;}
+    color(p){return p===p.toUpperCase()?"w":"b";}
+    dir(c){return c==="w"?-1:1;}
+    back(y,c){return c==="w"?y===0:y===7;}
+    clone(){return this.board.map(r=>r.slice());}
+    lineClear(sx,sy,tx,ty){
+        const dx=Math.sign(tx-sx),dy=Math.sign(ty-sy);
+        for(let x=sx+dx,y=sy+dy;x!==tx||y!==ty;x+=dx,y+=dy)
+            if(this.board[y][x]) return false;
+        return true;
+    }
     canMove(sx,sy,tx,ty){
-        if(!this.inBounds(sx,sy)||!this.inBounds(tx,ty))return false;
-        const p=this.board[sy][sx];
-        if(!p||this.pieceColor(p)!==this.turn)return false;
-        const target=this.board[ty][tx];
-        if(target&&this.pieceColor(target)===this.turn)return false;
+        if(!this.in(sx,sy)||!this.in(tx,ty))return false;
+        const p=this.board[sy][sx], c=this.color(p);
+        if(c!==this.turn)return false;
+        const tgt=this.board[ty][tx];
+        if(tgt&&this.color(tgt)===c)return false;
         const dx=tx-sx, dy=ty-sy, adx=Math.abs(dx), ady=Math.abs(dy);
         switch(p.toLowerCase()){
-            case "p":{                             // 폰
-                if(dx===0&&target)return false;
-                if(dx===0&&dy===this.dir(this.turn)&&!target)return true;
-                if(adx===1&&dy===this.dir(this.turn)&&target)return true;
+            case"p":
+                if(dx===0){
+                    if(dy===this.dir(c)&&!tgt) return true;
+                }else if(adx===1&&dy===this.dir(c)&&tgt) return true;
                 return false;
-            }
-            case "n": return adx*ady===2;          // 나이트
-            case "b": return adx===ady&&this.clearDiag(sx,sy,tx,ty);
-            case "r": return (dx===0||dy===0)&&this.clearLine(sx,sy,tx,ty);
-            case "q": return (adx===ady?this.clearDiag(sx,sy,tx,ty): (dx===0||dy===0)&&this.clearLine(sx,sy,tx,ty));
-            case "k": return Math.max(adx,ady)===1;
+            case"n": return adx*ady===2;
+            case"b": return adx===ady&&this.lineClear(sx,sy,tx,ty);
+            case"r": return (dx===0||dy===0)&&this.lineClear(sx,sy,tx,ty);
+            case"q": return (adx===ady?this.lineClear(sx,sy,tx,ty):(dx===0||dy===0)&&this.lineClear(sx,sy,tx,ty));
+            case"k": return Math.max(adx,ady)===1;
         }
         return false;
     }
-    clearLine(sx,sy,tx,ty){
-        const stepX=Math.sign(tx-sx), stepY=Math.sign(ty-sy);
-        for(let x=sx+stepX,y=sy+stepY; x!==tx||y!==ty; x+=stepX,y+=stepY){
-            if(this.board[y][x])return false;
-        }
-        return true;
-    }
-    clearDiag(...a){return this.clearLine(...a);}
-    /* ------------ 실제 이동 처리 ------------ */
     moveCoords(sx,sy,tx,ty){
-        if(!this.canMove(sx,sy,tx,ty))return {ok:false};
+        if(!this.canMove(sx,sy,tx,ty))return{ok:false};
         const piece=this.board[sy][sx];
-        const next=this.cloneBoard();
-        next[sy][sx]=null;
-        next[ty][tx]=piece;
-        // 승급(왕 제외, 퀸/룩/비숍/나이트 선택)
-        let promo=null;
-        if(["p","r","b","n"].includes(piece.toLowerCase()) && this.isBackRank(ty,this.turn)){
-            promo=true;
-        }
-        // 턴 전환
-        const tmpTurn=this.turn==="w"?"b":"w";
-        const newFen=new Chess().fen; // placeholder, replaced below
+        const next=this.clone();
+        next[sy][sx]=null; next[ty][tx]=piece;
+        const promo=["p","r","b","n"].includes(piece.toLowerCase())&&this.back(ty,this.turn);
         const inst=new Chess();
         inst.board=next;
-        inst.turn=tmpTurn;
+        inst.turn=this.turn==="w"?"b":"w";
         return{ok:true,fen:inst.fen(),promo};
     }
-    promote(x,y,choice,color){
-        const chosen=color==="w"?choice.toUpperCase():choice.toLowerCase();
-        this.board[y][x]=chosen;
-        this.turn=color==="w"?"b":"w";
+    promote(x,y,ch,c){
+        this.board[y][x]=c==="w"?ch.toUpperCase():ch.toLowerCase();
+        this.turn=c==="w"?"b":"w";
     }
 }
 Chess.START_FEN="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
-/* ===================== 전역 변수 ===================== */
-let chess   = new Chess();
-let socket  = null;
-let myColor = "w";
-let roomId  = "";
-let dragging = null;
-/* ================ 캔버스 렌더링 ================= */
-const ctx = $("board").getContext("2d");
-const img = new Image();
-img.src = "https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/128.png"; // 무료 피스 세트
-img.onload = draw;
+/* ===================== 전역 ===================== */
+let chess=new Chess();
+let socket=null, myColor="w", roomId="", dragging=null;
+/* ================ 렌더링 ================ */
+const ctx=$("board").getContext("2d");
+const img=new Image();
+img.src="https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/128.png";
 function draw(){
-    ctx.clearRect(0,0,480,480);
-    // 바둑판
-    for(let y=0;y<8;y++){
-        for(let x=0;x<8;x++){
-            ctx.fillStyle=(x+y)&1?"#769656":"#eeeed2";
-            ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
-        }
+    /* 판 */
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+        ctx.fillStyle=(x+y)&1?"#769656":"#eeeed2";
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
     }
-    // 기물
-    for(let y=0;y<8;y++){
-        for(let x=0;x<8;x++){
-            const p=chess.board[y][x];
-            if(!p)continue;
-            if(dragging&&dragging.from.x===x&&dragging.from.y===y)continue;
-            drawPiece(p,x,y);
-        }
+    /* 기물 */
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+        const p=chess.board[y][x];
+        if(!p)continue;
+        if(dragging&&dragging.from.x===x&&dragging.from.y===y)continue;
+        drawPiece(p,x,y);
     }
-    // 드래그 중 그림자
+    /* 드래그 그림자 */
     if(dragging){
-        const {mx,my}=dragging;
-        ctx.globalAlpha=0.8;
-        drawPiece(dragging.piece,(mx-30)/TILE,(my-30)/TILE,true);
+        ctx.globalAlpha=.8;
+        drawPiece(dragging.piece,(dragging.mx-30)/TILE,(dragging.my-30)/TILE,true);
         ctx.globalAlpha=1;
     }
 }
-function drawPiece(p,x,y,byPixel=false){
-    const base={k:0,q:1,r:2,b:3,n:4,p:5};
-    const col=p===p.toUpperCase()?0:1;
-    const row=base[p.toLowerCase()];
-    const sx=row*128, sy=col*128;
-    const dx=byPixel?x*TILE:x*TILE, dy=byPixel?y*TILE:y*TILE;
+function drawPiece(p,x,y,pixel=false){
+    if(!img.complete)return;        // 이미지 아직이면 패스 → 판은 보임
+    const map={k:0,q:1,r:2,b:3,n:4,p:5};
+    const sx=map[p.toLowerCase()]*128, sy=(p===p.toUpperCase()?0:1)*128;
+    const dx=pixel?x*TILE:x*TILE, dy=pixel?y*TILE:y*TILE;
     ctx.drawImage(img,sx,sy,128,128,dx,dy,TILE,TILE);
 }
-/* ============== 마우스 인터랙션 ============== */
+img.onload=draw;   // 말 그림 로드되면 다시 한번
+draw();            // ★ 즉시 호출해 바둑판 먼저 그림
+/* ============== 마우스 ============== */
 $("board").addEventListener("mousedown",e=>{
-    const rect=e.target.getBoundingClientRect();
-    const x=Math.floor((e.clientX-rect.left)/TILE);
-    const y=Math.floor((e.clientY-rect.top )/TILE);
-    const p=chess.board[y][x];
-    if(!p||chess.pieceColor(p)!==myColor)return;
-    dragging={from:{x,y},piece:p,mx:e.clientX-rect.left,my:e.clientY-rect.top};
+    const r=e.target.getBoundingClientRect();
+    const x=Math.floor((e.clientX-r.left)/TILE), y=Math.floor((e.clientY-r.top)/TILE);
+    const p=chess.board[y][x]; if(!p||chess.color(p)!==myColor)return;
+    dragging={from:{x,y},piece:p,mx:e.clientX-r.left,my:e.clientY-r.top};
 });
 $("board").addEventListener("mousemove",e=>{
     if(!dragging)return;
-    const rect=e.target.getBoundingClientRect();
-    dragging.mx=e.clientX-rect.left;
-    dragging.my=e.clientY-rect.top;
-    draw();
+    const r=e.target.getBoundingClientRect();
+    dragging.mx=e.clientX-r.left; dragging.my=e.clientY-r.top; draw();
 });
 $("board").addEventListener("mouseup",e=>{
     if(!dragging)return;
-    const rect=e.target.getBoundingClientRect();
-    const tx=Math.floor((e.clientX-rect.left)/TILE);
-    const ty=Math.floor((e.clientY-rect.top )/TILE);
-    const move=chess.moveCoords(dragging.from.x,dragging.from.y,tx,ty);
-    dragging=null;
-    draw();
-    if(move.ok){
-        if(move.promo){
-            showPromo(move,tx,ty);
-        }else{
-            chess.load(move.fen);
-            pushMove(move.fen);
-            draw();
-        }
-    }
+    const r=e.target.getBoundingClientRect();
+    const tx=Math.floor((e.clientX-r.left)/TILE), ty=Math.floor((e.clientY-r.top)/TILE);
+    const mv=chess.moveCoords(dragging.from.x,dragging.from.y,tx,ty); dragging=null; draw();
+    if(!mv.ok)return;
+    if(mv.promo) showPromo(mv,tx,ty);
+    else { chess.load(mv.fen); pushMove(mv.fen); draw(); }
 });
-/* ================ 승급 처리 ================ */
-function showPromo(move,x,y){
-    const modal=$("promo");
-    modal.classList.remove("hidden");
-    modal.querySelectorAll("button").forEach(btn=>{
+/* =============== 승급 =============== */
+function showPromo(mv,x,y){
+    const m=$("promo"); m.classList.remove("hidden");
+    m.querySelectorAll("button").forEach(btn=>{
         btn.onclick=()=>{
-            modal.classList.add("hidden");
+            m.classList.add("hidden");
             chess.promote(x,y,btn.dataset.piece,myColor);
-            const newFen=chess.fen();
-            pushMove(newFen);
-            draw();
+            pushMove(chess.fen()); draw();
         };
     });
 }
 /* =============== 네트워크 =============== */
 function connect(){
     socket=new WebSocket(WS_URL);
-    socket.onopen = ()=>status(true);
-    socket.onclose=()=>status(false);
+    socket.onopen = ()=>setDot(true);
+    socket.onclose=()=>{setDot(false);logInfo("연결 종료됨");};
     socket.onmessage=e=>{
-        let msg;
-        try{msg=JSON.parse(e.data);}catch{console.warn("JSON 파싱 실패",e.data);return;}
-        if(msg.type==="sync_state"){
-            chess.load(msg.fen);
-            myColor=msg.color;
-            draw();
-        }
+        let msg;try{msg=JSON.parse(e.data);}catch{return;}
+        if(msg.type==="sync_state"){ chess.load(msg.fen); myColor=msg.color; draw(); }
+        if(msg.type==="peer_joined")  logInfo("상대가 입장했습니다!");
+        if(msg.type==="peer_left")    logInfo("상대가 나갔습니다.");
     };
 }
-function pushMove(fen){
-    send(socket,{type:"sync_state",room:roomId,fen});
-}
-/* ============= 방 생성 / 입장 ============= */
-$("create").onclick = ()=>{
+function pushMove(fen){ send(socket,{type:"sync_state",room:roomId,fen}); }
+/* ===== 방 생성 / 입장 ===== */
+$("create").onclick=()=>{
     if(socket)socket.close();
     roomId=$("room").value.trim().toUpperCase()||Math.random().toString(36).substr(2,6).toUpperCase();
-    $("room").value=roomId;
-    connect();
+    $("room").value=roomId; connect();
     send(socket,{type:"create",room:roomId});
-    alert(`방이 생성되었습니다.\n코드: ${roomId}`);
+    alert(`방이 생성되었습니다.\n코드: ${roomId}`); logInfo("대기 중…");
 };
-$("join").onclick = ()=>{
+$("join").onclick=()=>{
     roomId=$("room").value.trim().toUpperCase();
     if(!roomId)return alert("방 코드를 입력하세요.");
     if(socket)socket.close();
-    connect();
-    send(socket,{type:"join",room:roomId});
+    connect(); send(socket,{type:"join",room:roomId});
+    logInfo("입장 시도 중…");
 };
-/* 최초 연결 상태표시 */
-status(false);
+setDot(false);
 </script>
 </body>
 </html>
