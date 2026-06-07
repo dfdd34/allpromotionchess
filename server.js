@@ -19,12 +19,19 @@ function broadcast(roomId, data) {
   }
 }
 
+function normalizeRoomId(roomId) {
+  if (typeof roomId !== "string") return "";
+  return roomId.trim().toUpperCase();
+}
+
 function makeRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-function joinRoom(ws, roomId) {
-  if (!roomId || typeof roomId !== "string" || !roomId.trim()) {
+function joinRoom(ws, rawRoomId) {
+  let roomId = normalizeRoomId(rawRoomId);
+
+  if (!roomId) {
     roomId = makeRoomId();
   }
 
@@ -114,7 +121,6 @@ wss.on("connection", (ws) => {
       const room = rooms.get(roomId);
       if (!room) return;
 
-      // 현재는 클라이언트 신뢰 방식
       broadcast(roomId, {
         type: "move",
         from: data.from,
@@ -140,13 +146,6 @@ wss.on("connection", (ws) => {
         state: room.state
       });
 
-      return;
-    }
-
-    if (data.type === "chat") {
-      const roomId = ws.roomId;
-      if (!roomId) return;
-      broadcast(roomId, { type: "chat", text: data.text || "" });
       return;
     }
   });
