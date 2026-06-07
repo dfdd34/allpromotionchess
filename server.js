@@ -1,51 +1,73 @@
-import WebSocket, { WebSocketServer } from "ws";
+// server.js – Render(또는 Heroku, Vercel Function)용 초경량 WS 서버
+import { WebSocketServer } from "ws";
 
-const wss = new WebSocketServer({ port: 8080 });
-const rooms = {};             // roomId -> [ws, ws]
+const PORT = process.env.PORT || 8080;
+const wss  = new WebSocketServer({ port: PORT });
 
-function broadcast(room, obj){
-  rooms[room]?.forEach(c => c.readyState===1 && c.send(JSON.stringify(obj)));
+const rooms = new Map();                 // roomId → Set<ws>
+
+function send(ws, obj){
+  ws.readyState === 1 && ws.send(JSON.stringify(obj));
+}
+function broadcast(roomId, obj){
+  const room = rooms.get(roomId);
+  if(!room) return;
+  const msg = JSON.stringify(obj);
+  room.forEach(c => c.readyState === 1 && c.send(msg));
 }
 
 wss.on("connection", ws => {
   ws.on("message", raw => {
-    let msg; try{msg=JSON.parse(raw);}catch{return;}
-    const { type, room, fen } = msg;
+    let m; try{ m = JSON.parse(raw); } catch { return; }
+    const { type, room, fen } = m;
 
-    if(type==="create"){
-      rooms[room] = [ws];
-      ws.room = room;
+    // 1) 방 만들기 ----------------------------------------------------------
+    if(type === "create"){
+      rooms.set(room, new Set([ws]));
+      ws.room  = room;
       ws.color = "w";
+      send(ws, { type: "created", room });
+      return;
     }
 
-    if(type==="join"){
-      if(!rooms[room] || rooms[room].length>=2){
-        ws.send(JSON.stringify({type:"error",msg:"방이 가득 찼습니다"}));
-        return;
+    // 2) 방 입장 ------------------------------------------------------------
+    if(type === "join"){
+      if(!rooms.has(room) || rooms.get(room).size >= 2){
+        return send(ws, { type: "error", msg: "방이 가득 찼습니다" });
       }
-      rooms[room].push(ws);
-      ws.room = room;
+      rooms.get(room).add(ws);
+      ws.room  = room;
       ws.color = "b";
-      // 두 플레이어 모두에게 상대 입장 알림
-      broadcast(room,{type:"peer_joined"});
-      // 초기 동기화 (백색이 원본 보드 전송)
-      const white = rooms[room].find(c => c.color==="w");
-      if(white?.lastFen) broadcast(room,{type:"sync_state",fen:white.lastFen,color:"w"});
+
+      // 새 참가자에게 현재 FEN 전달
+      const white = [...rooms.get(room)].find(c => c.color === "w");
+      if(white?.lastFen){
+        send(ws, { type: "sync_state", fen: white.lastFen, color: "b" });
+      }
+
+      // 양쪽 모두에게 알림
+      broadcast(room, { type: "peer_joined" });
+      return;
     }
 
-    if(type==="sync_state"){
-      ws.lastFen = fen;                 // 직전 FEN 저장
-      broadcast(room,{type:"sync_state",fen,color:ws.color});
+    // 3) 보드 상태 동기화 ---------------------------------------------------
+    if(type === "sync_state"){
+      ws.lastFen = fen;
+      broadcast(room, { type: "sync_state", fen, color: ws.color });
     }
   });
 
+  // 연결 종료 ---------------------------------------------------------------
   ws.on("close", () => {
-    const room = ws.room;
+    const { room } = ws;
     if(!room) return;
-    rooms[room] = rooms[room].filter(c => c!==ws);
-    broadcast(room,{type:"peer_left"});
-    if(rooms[room].length===0) delete rooms[room];
+    const set = rooms.get(room);
+    if(!set) return;
+
+    set.delete(ws);
+    broadcast(room, { type: "peer_left" });
+    if(set.size === 0) rooms.delete(room);
   });
 });
 
-console.log("WebSocket 서버 실행 중 : ws://localhost:8080");
+console.log(`♟  WebSocket server running on :${PORT}`);
