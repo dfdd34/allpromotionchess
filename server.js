@@ -4,6 +4,21 @@ import { WebSocketServer } from "ws";
 
 const PORT = process.env.PORT || 8080;
 
+// server.js 의 HTTP 핸들러 맨 위에 공통 헤더 추가
+const setCORS = res => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+};
+
+// 기존 createServer 콜백 안에서
+const server = http.createServer((req, res) => {
+  setCORS(res);               // ← 추가!
+
+  if (req.url === "/healthz") { … }
+  …
+});
+
+
 /* ───── 1. 아주 얇은 HTTP 서버 ───── */
 const server = http.createServer((req, res) => {
   if (req.url === "/healthz") {          // Render 헬스체크용(선택)
