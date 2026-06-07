@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>변형체스 멀티플레이</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --panel2: #0f172a;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --light: #e5e7eb;
+      --dark: #374151;
+      --select: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(180deg, #0b1020, #111827);
+      color: var(--text);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 16px;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .board-wrap, .side {
+      background: rgba(17, 24, 39, 0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+    }
+    .topbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    select, button, input {
+      background: #111827;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+    }
+    button.primary { background: #14532d; border-color: #22c55e; }
+    button.warn { background: #3f1d0c; border-color: #f59e0b; }
+    button.danger { background: #3b0a0a; border-color: #ef4444; }
+    .status {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .board {
+      width: min(90vw, 720px);
+      aspect-ratio: 1 / 1;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 12px;
+      user-select: none;
+    }
+    .sq {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(20px, 4vw, 42px);
+      cursor: pointer;
+      position: relative;
+    }
+    .sq.light { background: #e5e7eb; color: #111827; }
+    .sq.dark { background: #374151; color: #f9fafb; }
+    .sq.selected::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border: 3px solid var(--select);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    .sq.lastmove::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      background: rgba(34, 197, 94, 0.25);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    .panel-title {
+      font-weight: 700;
+      margin: 0 0 12px;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .log {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 140px;
+      max-height: 280px;
+      overflow: auto;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .board { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="board-wrap">
+      <div class="topbar">
+        <select id="mode">
+          <option value="single">single</option>
+          <option value="online">online</option>
+        </select>
+        <button id="btnCreate" class="primary">방 만들기</button>
+        <input id="roomId" placeholder="방 코드" style="width: 120px;" />
+        <button id="btnJoin">입장</button>
+        <button id="btnAnalyze" class="warn">분석</button>
+        <button id="btnReset" class="danger">리셋</button>
+      </div>
+      <div class="small" id="meta">Mode: single | Turn: white</div>
+      <div class="board" id="board"></div>
+      <div class="status" id="status">준비됨</div>
+    </div>
+
+    <div class="side">
+      <h3 class="panel-title">분석 / 로그</h3>
+      <div class="row">
+        <button id="btnEval">현재판 평가</button>
+        <button id="btnBest">추천수</button>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    const WS_URL = "wss://YOUR-RENDER-SERVICE.onrender.com";
+
+    const state = {
+      mode: "single",
+      socket: null,
+      connected: false,
+      roomId: "",
+      myColor: "white",
+      turn: "white",
+      selected: null,
+      lastMove: null,
+      board: initBoard(),
+      history: [],
+    };
+
+    const pieceToChar = {
+      wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
+      bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚",
+    };
+
+    const elBoard = document.getElementById("board");
+    const elStatus = document.getElementById("status");
+    const elMeta = document.getElementById("meta");
+    const elLog = document.getElementById("log");
+    const elMode = document.getElementById("mode");
+    const elRoom = document.getElementById("roomId");
+
+    document.getElementById("btnCreate").onclick = createRoom;
+    document.getElementById("btnJoin").onclick = joinRoom;
+    document.getElementById("btnReset").onclick = resetGame;
+    document.getElementById("btnAnalyze").onclick = analyzePosition;
+    document.getElementById("btnEval").onclick = () => log("평가: " + evaluatePosition(state.board));
+    document.getElementById("btnBest").onclick = () => log("추천수: " + getRecommendedMove(state.board, state.turn));
+
+    elMode.onchange = () => {
+      state.mode = elMode.value;
+      updateMeta();
+      log("mode changed: " + state.mode);
+    };
+
+    function initBoard() {
+      const b = Array(8).fill(null).map(() => Array(8).fill(null));
+      const back = ["r","n","b","q","k","b","n","r"];
+      for (let c = 0; c < 8; c++) {
+        b[0][c] = "b" + back[c];
+        b[1][c] = "bp";
+        b[6][c] = "wp";
+        b[7][c] = "w" + back[c];
+      }
+      return b;
+    }
+
+    function resetGame() {
+      state.board = initBoard();
+      state.turn = "white";
+      state.selected = null;
+      state.lastMove = null;
+      state.history = [];
+      render();
+      syncState();
+      log("게임 리셋");
+    }
+
+    function createRoom() {
+      if (!ensureSocket()) return;
+      send({ type: "create_room" });
+    }
+
+    function joinRoom() {
+      if (!ensureSocket()) return;
+      const roomId = elRoom.value.trim();
+      if (!roomId) return log("방 코드를 입력하세요.");
+      send({ type: "join_room", roomId });
+    }
+
+    function ensureSocket() {
+      if (state.mode !== "online") {
+        log("online 모드로 바꾼 후 사용하세요.");
+        return false;
+      }
+      if (state.socket && state.connected) return true;
+      connectSocket();
+      return false;
+    }
+
+    function connectSocket() {
+      if (state.socket) {
+        try { state.socket.close(); } catch {}
+      }
+      state.socket = new WebSocket(WS_URL);
+      state.socket.onopen = () => {
+        state.connected = true;
+        updateMeta();
+        log("소켓 연결됨");
+      };
+      state.socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleSocketMessage(msg);
+        } catch {
+          log("서버: " + event.data);
+        }
+      };
+      state.socket.onclose = () => {
+        state.connected = false;
+        updateMeta();
+        log("소켓 연결 종료");
+      };
+      state.socket.onerror = () => log("소켓 에러");
+    }
+
+    function send(payload) {
+      if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+        log("소켓이 연결되지 않았습니다.");
+        return;
+      }
+      state.socket.send(JSON.stringify(payload));
+    }
+
+    function handleSocketMessage(msg) {
+      if (msg.type === "room_created") {
+        state.roomId = msg.roomId;
+        state.myColor = msg.color || "white";
+        elRoom.value = msg.roomId;
+        log(`방 생성: ${msg.roomId} / 내 색: ${state.myColor}`);
+      }
+      if (msg.type === "room_joined") {
+        state.roomId = msg.roomId;
+        state.myColor = msg.color || "black";
+        log(`방 입장: ${msg.roomId} / 내 색: ${state.myColor}`);
+      }
+      if (msg.type === "state") {
+        state.board = msg.board;
+        state.turn = msg.turn;
+        state.lastMove = msg.lastMove || null;
+        render();
+      }
+      if (msg.type === "move_result") {
+        state.board = msg.board;
+        state.turn = msg.turn;
+        state.lastMove = msg.lastMove || null;
+        render();
+      }
+      if (msg.type === "analysis") {
+        log("분석 결과:\n" + JSON.stringify(msg.result, null, 2));
+      }
+      if (msg.type === "info") log(msg.message);
+    }
+
+    function render() {
+      elBoard.innerHTML = "";
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement("div");
+          const dark = (r + c) % 2 === 1;
+          sq.className = "sq " + (dark ? "dark" : "light");
+          const piece = state.board[r][c];
+          sq.textContent = piece ? pieceToChar[piece] : "";
+          if (state.selected && state.selected.r === r && state.selected.c === c) sq.classList.add("selected");
+          if (state.lastMove && ((state.lastMove.from.r === r && state.lastMove.from.c === c) || (state.lastMove.to.r === r && state.lastMove.to.c === c))) {
+            sq.classList.add("lastmove");
+          }
+          sq.onclick = () => onSquareClick(r, c);
+          elBoard.appendChild(sq);
+        }
+      }
+      updateMeta();
+    }
+
+    function onSquareClick(r, c) {
+      const piece = state.board[r][c];
+      if (state.selected) {
+        const from = state.selected;
+        if (from.r === r && from.c === c) {
+          state.selected = null;
+          render();
+          return;
+        }
+        const moved = tryMove(from.r, from.c, r, c);
+        state.selected = null;
+        if (!moved) log("불가능한 수");
+        render();
+        return;
+      }
+
+      if (piece && pieceColor(piece) === state.turn) {
+        if (state.mode === "online" && state.myColor !== state.turn) {
+          log("아직 내 턴이 아닙니다.");
+          return;
+        }
+        state.selected = { r, c };
+        render();
+      }
+    }
+
+    function tryMove(fr, fc, tr, tc) {
+      const piece = state.board[fr][fc];
+      const target = state.board[tr][tc];
+      if (!piece) return false;
+      if (target && pieceColor(target) === pieceColor(piece)) return false;
+      if (!isLegalMove(state.board, fr, fc, tr, tc)) return false;
+
+      const next = cloneBoard(state.board);
+      next[tr][tc] = next[fr][fc];
+      next[fr][fc] = null;
+
+      // Omni-Promotion: back rank 도착 시 pawn 제외, king 제외한 모든 말 승급
+      const color = pieceColor(piece);
+      if ((piece[1] !== "p" && piece[1] !== "k") && ((color === "white" && tr === 0) || (color === "black" && tr === 7))) {
+        next[tr][tc] = color[0] + "q";
+      }
+
+      state.board = next;
+      state.turn = opposite(state.turn);
+      state.lastMove = { from: { r: fr, c: fc }, to: { r: tr, c: tc } };
+      state.history.push({ fr, fc, tr, tc, piece });
+      render();
+      syncState();
+
+      if (state.mode === "online") {
+        send({ type: "move", move: { fr, fc, tr, tc }, board: state.board, turn: state.turn, lastMove: state.lastMove });
+      }
+
+      return true;
+    }
+
+    function isLegalMove(board, fr, fc, tr, tc) {
+      const piece = board[fr][fc];
+      if (!piece) return false;
+      const color = pieceColor(piece);
+      const dr = tr - fr;
+      const dc = tc - fc;
+      const absDr = Math.abs(dr);
+      const absDc = Math.abs(dc);
+
+      if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false;
+
+      const type = piece[1];
+      if (type === "p") {
+        const dir = color === "white" ? -1 : 1;
+        const startRow = color === "white" ? 6 : 1;
+        if (dc === 0 && !board[tr][tc]) {
+          if (dr === dir) return true;
+          if (fr === startRow && dr === 2 * dir && !board[fr + dir][fc]) return true;
+        }
+        if (absDc === 1 && dr === dir && board[tr][tc] && pieceColor(board[tr][tc]) !== color) return true;
+        return false;
+      }
+      if (type === "n") return (absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2);
+      if (type === "k") return absDr <= 1 && absDc <= 1;
+      if (type === "b" || type === "r" || type === "q") {
+        if (type === "b" && absDr !== absDc) return false;
+        if (type === "r" && !(dr === 0 || dc === 0)) return false;
+        if (type === "q" && !(absDr === absDc || dr === 0 || dc === 0)) return false;
+        return pathClear(board, fr, fc, tr, tc);
+      }
+      return false;
+    }
+
+    function pathClear(board, fr, fc, tr, tc) {
+      const stepR = Math.sign(tr - fr);
+      const stepC = Math.sign(tc - fc);
+      let r = fr + stepR;
+      let c = fc + stepC;
+      while (r !== tr || c !== tc) {
+        if (board[r][c]) return false;
+        r += stepR;
+        c += stepC;
+      }
+      return true;
+    }
+
+    function pieceColor(piece) {
+      return piece[0] === "w" ? "white" : "black";
+    }
+
+    function opposite(color) {
+      return color === "white" ? "black" : "white";
+    }
+
+    function cloneBoard(board) {
+      return board.map(row => row.slice());
+    }
+
+    function syncState() {
+      updateMeta();
+    }
+
+    function updateMeta() {
+      elMeta.textContent = `Mode: ${state.mode} | Turn: ${state.turn} | Room: ${state.roomId || "-"} | Me: ${state.myColor} | Socket: ${state.connected ? "connected" : "off"}`;
+      elStatus.textContent = state.mode === "online"
+        ? "온라인 모드입니다. 방 만들기/입장 후 동기화됩니다."
+        : "싱글 모드입니다. 바로 플레이 가능합니다.";
+    }
+
+    function log(msg) {
+      elLog.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + elLog.textContent;
+    }
+
+    function evaluatePosition(board) {
+      const values = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+      let score = 0;
+      for (const row of board) {
+        for (const p of row) {
+          if (!p) continue;
+          const v = values[p[1]] || 0;
+          score += p[0] === "w" ? v : -v;
+        }
+      }
+      return score;
+    }
+
+    function getRecommendedMove(board, turn) {
+      return "분석 엔진 연결 후 활성화";
+    }
+
+    function analyzePosition() {
+      const result = {
+        fenLike: boardToSimpleString(state.board, state.turn),
+        eval: evaluatePosition(state.board),
+        note: "여기에 나중에 Web Worker/서버 엔진 연결 가능"
+      };
+      log("분석 준비:\n" + JSON.stringify(result, null, 2));
+      if (state.mode === "online") {
+        send({ type: "analyze", position: result });
+      }
+    }
+
+    function boardToSimpleString(board, turn) {
+      return board.map(row => row.map(p => p || "..").join(" ")).join(" / ") + " | " + turn;
+    }
+
+    render();
+    updateMeta();
+  </script>
+</body>
+</html>
