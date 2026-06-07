@@ -12,10 +12,9 @@
       --text: #f2f2f2;
       --muted: #aaa;
       --accent: #4caf50;
+      --accent2: #2196f3;
       --danger: #e53935;
       --border: #333;
-      --white: #f5f5f5;
-      --black: #222;
       --lightSq: #ddd;
       --darkSq: #769656;
     }
@@ -59,9 +58,7 @@
       color: var(--text);
     }
 
-    .chip strong {
-      color: #fff;
-    }
+    .chip strong { color: #fff; }
 
     #joinPanel {
       display: flex;
@@ -83,28 +80,19 @@
       text-transform: uppercase;
     }
 
-    #joinBtn, #leaveBtn, #copyBtn {
+    #createBtn, #joinBtn, #leaveBtn, #copyBtn {
       padding: 12px 14px;
       border-radius: 10px;
       border: none;
       font-size: 15px;
       cursor: pointer;
-    }
-
-    #joinBtn {
-      background: var(--accent);
       color: #fff;
     }
 
-    #leaveBtn {
-      background: var(--danger);
-      color: #fff;
-    }
-
-    #copyBtn {
-      background: #444;
-      color: #fff;
-    }
+    #createBtn { background: var(--accent); }
+    #joinBtn { background: var(--accent2); }
+    #leaveBtn { background: var(--danger); }
+    #copyBtn { background: #444; }
 
     #status {
       text-align: center;
@@ -198,9 +186,7 @@
       cursor: pointer;
     }
 
-    .promoBtn:hover {
-      background: #444;
-    }
+    .promoBtn:hover { background: #444; }
 
     .small {
       font-size: 12px;
@@ -209,7 +195,7 @@
 
     @media (max-width: 480px) {
       h1 { font-size: 18px; }
-      #roomInput, #joinBtn, #leaveBtn, #copyBtn { width: 100%; }
+      #roomInput, #createBtn, #joinBtn, #leaveBtn, #copyBtn { width: 100%; }
       #joinPanel { flex-direction: column; }
     }
   </style>
@@ -226,13 +212,14 @@
     </div>
 
     <div id="joinPanel">
-      <input id="roomInput" type="text" placeholder="룸코드 입력 (예: ABC123)" maxlength="12" />
-      <button id="joinBtn">입장</button>
+      <input id="roomInput" type="text" placeholder="룸코드 입력 (비우면 새 룸)" maxlength="12" />
+      <button id="createBtn">룸 만들기</button>
+      <button id="joinBtn">룸 입장</button>
       <button id="copyBtn">룸코드 복사</button>
       <button id="leaveBtn">나가기</button>
     </div>
 
-    <div id="status">룸코드를 입력하고 입장하세요.</div>
+    <div id="status">룸을 만들거나, 룸코드를 입력하고 입장하세요.</div>
 
     <div id="boardWrap">
       <div id="board"></div>
@@ -264,17 +251,14 @@
     const roomInput = document.getElementById("roomInput");
     const promoOverlay = document.getElementById("promoOverlay");
 
+    const createBtn = document.getElementById("createBtn");
     const joinBtn = document.getElementById("joinBtn");
     const leaveBtn = document.getElementById("leaveBtn");
     const copyBtn = document.getElementById("copyBtn");
 
     const U = {
-      w: {
-        k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙"
-      },
-      b: {
-        k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟"
-      }
+      w: { k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙" },
+      b: { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" }
     };
 
     let ws = null;
@@ -318,13 +302,13 @@
       ws.onopen = () => {
         connected = true;
         setConn("연결됨");
-        setStatus("서버 연결 완료. 룸코드를 입력하고 입장하세요.");
+        setStatus("서버 연결 완료.");
       };
 
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         connected = false;
         setConn("끊김");
-        setStatus("연결이 끊겼습니다.");
+        setStatus(`연결이 끊겼습니다. code=${e.code}`);
       };
 
       ws.onerror = () => {
@@ -342,8 +326,8 @@
           mySide = data.side;
           setRoomLabel(roomId);
           setSideLabel(mySide === "w" ? "White" : "Black");
-          setStatus(data.message || "룸에 입장했습니다.");
           roomInput.value = roomId;
+          setStatus(data.message || "룸에 입장했습니다.");
           return;
         }
 
@@ -383,6 +367,15 @@
       };
     }
 
+    function joinRoom(mode) {
+      const code = roomInput.value.trim().toUpperCase();
+      if (!connected) {
+        setStatus("먼저 서버에 연결 중이어야 합니다.");
+        return;
+      }
+      send({ type: "join_room", roomId: mode === "create" ? "" : code });
+    }
+
     function leaveRoom() {
       send({ type: "leave_room" });
       roomId = "";
@@ -403,15 +396,8 @@
       });
     }
 
-    joinBtn.addEventListener("click", () => {
-      const code = roomInput.value.trim().toUpperCase();
-      if (!connected) {
-        setStatus("먼저 서버에 연결 중이어야 합니다.");
-        return;
-      }
-      send({ type: "join_room", roomId: code });
-    });
-
+    createBtn.addEventListener("click", () => joinRoom("create"));
+    joinBtn.addEventListener("click", () => joinRoom("join"));
     leaveBtn.addEventListener("click", leaveRoom);
     copyBtn.addEventListener("click", copyRoomCode);
 
@@ -505,23 +491,15 @@
           sq.dataset.c = c;
 
           const piece = board[r][c];
-          if (piece) {
-            sq.textContent = U[colorOf(piece)][typeOf(piece)];
-          }
+          if (piece) sq.textContent = U[colorOf(piece)][typeOf(piece)];
 
-          if (selected && selected.r === r && selected.c === c) {
-            sq.classList.add("selected");
-          }
-
-          if (legalMoves.some(([rr, cc]) => rr === r && cc === c)) {
-            sq.classList.add("hint");
-          }
+          if (selected && selected.r === r && selected.c === c) sq.classList.add("selected");
+          if (legalMoves.some(([rr, cc]) => rr === r && cc === c)) sq.classList.add("hint");
 
           sq.addEventListener("click", onSquareClick);
           boardEl.appendChild(sq);
         }
       }
-
       setTurnLabel(turn === "w" ? "White" : "Black");
     }
 
