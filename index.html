@@ -319,20 +319,23 @@
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
 
-        if (data.type === "connected") return;
-
         if (data.type === "room_joined") {
           roomId = data.roomId;
           mySide = data.side;
           setRoomLabel(roomId);
           setSideLabel(mySide === "w" ? "White" : "Black");
           roomInput.value = roomId;
-          setStatus(data.message || "룸에 입장했습니다.");
+          setStatus(data.message + ": " + data.roomId);
           return;
         }
 
         if (data.type === "room_full") {
-          setStatus("방이 가득 찼습니다.");
+          setStatus("방이 가득 찼습니다. " + data.roomId);
+          return;
+        }
+
+        if (data.type === "start_game") {
+          setStatus("게임 시작!");
           return;
         }
 
@@ -343,11 +346,6 @@
 
         if (data.type === "opponent_left") {
           setStatus("상대가 나갔습니다.");
-          return;
-        }
-
-        if (data.type === "start_game") {
-          setStatus("게임 시작!");
           return;
         }
 
@@ -362,17 +360,16 @@
             turn = data.state.turn || turn;
             render();
           }
-          return;
         }
       };
     }
 
     function joinRoom(mode) {
-      const code = roomInput.value.trim().toUpperCase();
       if (!connected) {
-        setStatus("먼저 서버에 연결 중이어야 합니다.");
+        setStatus("먼저 서버에 연결되어야 합니다.");
         return;
       }
+      const code = roomInput.value.trim().toUpperCase();
       send({
         type: mode === "create" ? "create_room" : "join_room",
         roomId: mode === "create" ? "" : code
@@ -412,8 +409,7 @@
     function typeOf(piece) { return piece ? piece[1] : null; }
 
     function allowedToMove(piece) {
-      if (!piece) return false;
-      if (!mySide) return false;
+      if (!piece || !mySide) return false;
       return colorOf(piece) === mySide && turn === mySide;
     }
 
@@ -567,8 +563,7 @@
         const { fr, fc, tr, tc, piece } = awaitingPromotion;
 
         const next = cloneBoard(board);
-        const promoted = colorOf(piece) + promo;
-        next[tr][tc] = promoted;
+        next[tr][tc] = colorOf(piece) + promo;
         next[fr][fc] = null;
 
         board = next;
@@ -598,8 +593,7 @@
       if (!piece) return;
 
       const next = cloneBoard(board);
-      const promoted = data.promotion ? (colorOf(piece) + data.promotion) : piece;
-      next[tr][tc] = promoted;
+      next[tr][tc] = data.promotion ? (colorOf(piece) + data.promotion) : piece;
       next[fr][fc] = null;
 
       board = next;
