@@ -1,483 +1,611 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Omni-Promotion Chess</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>All Promotion Chess</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      margin: 0;
-      padding: 20px;
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+      --accent:#38bdf8;
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --light:#f8fafc;
+      --dark:#475569;
     }
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 520px 1fr;
-      gap: 24px;
-      align-items: start;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:linear-gradient(180deg,#0f172a,#020617);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;
     }
-    h1 {
-      margin: 0 0 12px;
-      font-size: 28px;
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+      padding:12px;
+      display:grid;
+      gap:12px;
     }
-    .panel {
-      background: #1b1b1b;
-      border: 1px solid #333;
-      border-radius: 12px;
-      padding: 16px;
+    .topbar,.panel{
+      background:rgba(17,24,39,.94);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      box-shadow:0 12px 30px rgba(0,0,0,.25);
     }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(8, 60px);
-      grid-template-rows: repeat(8, 60px);
-      width: 480px;
-      height: 480px;
-      border: 2px solid #444;
-      margin-top: 12px;
+    .topbar{
+      padding:12px 14px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
     }
-    .sq {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 34px;
-      user-select: none;
-      cursor: pointer;
+    .title{
+      font-size:18px;
+      font-weight:800;
+      letter-spacing:.2px;
     }
-    .light { background: #f0d9b5; color: #111; }
-    .dark  { background: #b58863; color: #111; }
-    .selected {
-      outline: 3px solid #00d1ff;
-      outline-offset: -3px;
+    .chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
     }
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 12px 0;
+    .chip{
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.08);
+      font-size:13px;
     }
-    button, input, select {
-      background: #222;
-      color: #eee;
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 14px;
+    .chip.good{border-color:rgba(34,197,94,.35); color:#bbf7d0}
+    .chip.warn{border-color:rgba(245,158,11,.35); color:#fde68a}
+    .chip.bad{border-color:rgba(239,68,68,.35); color:#fecaca}
+    .main{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 300px;
+      gap:12px;
     }
-    button:hover {
-      background: #2a2a2a;
-      cursor: pointer;
+    @media (max-width:900px){
+      .main{grid-template-columns:1fr}
     }
-    input {
-      min-width: 160px;
+    .board-panel{
+      padding:12px;
+      display:grid;
+      place-items:center;
     }
-    #status {
-      padding: 10px 12px;
-      background: #151515;
-      border: 1px solid #333;
-      border-radius: 8px;
-      margin-top: 12px;
-      min-height: 20px;
+    .board-wrap{
+      width:min(94vw,760px);
+      aspect-ratio:1/1;
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow:0 16px 40px rgba(0,0,0,.35);
     }
-    .hint {
-      color: #bbb;
-      font-size: 13px;
-      line-height: 1.5;
+    .board{
+      width:100%;
+      height:100%;
+      display:grid;
+      grid-template-columns:repeat(8,1fr);
+      grid-template-rows:repeat(8,1fr);
     }
-    .row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin: 8px 0;
+    .sq{
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      cursor:pointer;
+      font-size:clamp(22px,4.2vw,52px);
     }
-    .label {
-      min-width: 70px;
-      color: #bbb;
+    .light{background:var(--light); color:#0f172a}
+    .dark{background:var(--dark); color:var(--light)}
+    .sq.sel::after{
+      content:"";
+      position:absolute;
+      inset:10%;
+      border:4px solid rgba(245,158,11,.95);
+      border-radius:12px;
+      pointer-events:none;
     }
+    .sq.move::before{
+      content:"";
+      position:absolute;
+      width:18%;
+      height:18%;
+      border-radius:50%;
+      background:rgba(34,197,94,.6);
+    }
+    .sq.cap::before{
+      content:"";
+      position:absolute;
+      inset:12%;
+      border:4px solid rgba(239,68,68,.8);
+      border-radius:50%;
+    }
+    .side{
+      padding:12px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+    .box{
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:12px;
+    }
+    .box h3{
+      margin:0 0 8px;
+      font-size:15px;
+    }
+    .box p{
+      margin:6px 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.45;
+    }
+    .btnrow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    button{
+      border:0;
+      border-radius:10px;
+      padding:10px 12px;
+      font-weight:700;
+      cursor:pointer;
+      color:white;
+      background:#2563eb;
+    }
+    button.secondary{background:#334155}
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .moves{
+      max-height:280px;
+      overflow:auto;
+      font-size:13px;
+      line-height:1.5;
+      white-space:pre-wrap;
+      color:#cbd5e1;
+    }
+    .overlay{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(2,6,23,.74);
+      z-index:100;
+      padding:16px;
+    }
+    .overlay.show{display:flex}
+    .promo{
+      width:min(94vw,360px);
+      background:#0f172a;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 22px 60px rgba(0,0,0,.5);
+    }
+    .promo h2{margin:0 0 10px; font-size:18px}
+    .promo p{margin:0 0 14px; color:var(--muted); font-size:14px}
+    .promo-grid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px;
+    }
+    .promo-grid button{
+      padding:14px 10px;
+      font-size:16px;
+      background:#1d4ed8;
+    }
+    .small{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="panel">
-      <h1>Omni-Promotion Chess</h1>
-      <div class="hint">
-        - 온라인 모드에서는 Render WebSocket 서버를 사용합니다.<br>
-        - 일반 승격은 폰만, Omni-Promotion은 다른 말도 백랭크 도달 시 퀸으로 변합니다.
+    <div class="topbar">
+      <div class="title">All Promotion Chess</div>
+      <div class="chips">
+        <span class="chip" id="roomChip">룸: 없음</span>
+        <span class="chip" id="sideChip">내 색: 미정</span>
+        <span class="chip" id="turnChip">턴: -</span>
+        <span class="chip warn" id="connChip">연결 중</span>
       </div>
-
-      <div class="row">
-        <span class="label">Mode</span>
-        <select id="mode">
-          <option value="single">single</option>
-          <option value="online">online</option>
-        </select>
-      </div>
-
-      <div class="row">
-        <span class="label">Room</span>
-        <input id="roomId" type="text" placeholder="room id" />
-      </div>
-
-      <div class="controls">
-        <button onclick="createRoom()">Create</button>
-        <button onclick="joinRoom()">Join</button>
-        <button onclick="connectWS()">Connect</button>
-        <button onclick="resetGame()">Reset</button>
-        <button onclick="analyzePosition()">Analyze</button>
-      </div>
-
-      <div id="status">준비됨</div>
-      <div id="board"></div>
     </div>
 
-    <div class="panel">
-      <h2>Game Info</h2>
-      <div id="info" class="hint">
-        말 클릭 → 이동 시도.<br>
-        온라인 연결 후에는 상대 수가 실시간으로 전달됩니다.
+    <div class="main">
+      <div class="panel board-panel">
+        <div class="board-wrap">
+          <div id="board" class="board"></div>
+        </div>
       </div>
-      <hr style="border-color:#333; margin:16px 0;">
-      <div class="hint">
-        <b>주의</b><br>
-        이 파일에는 기본적인 온라인 연결이 포함되어 있습니다.<br>
-        실제 턴 검증/전체 동기화는 다음 단계에서 강화할 수 있습니다.
+
+      <div class="panel side">
+        <div class="box">
+          <h3>상태</h3>
+          <p id="msg">서버 연결 대기 중...</p>
+          <p id="roomInfo">룸이 없습니다.</p>
+          <p id="opponentInfo">상대 없음</p>
+        </div>
+
+        <div class="box">
+          <h3>컨트롤</h3>
+          <div class="btnrow">
+            <button id="copyRoomBtn">룸 코드 복사</button>
+            <button id="resetSelBtn" class="secondary">선택 해제</button>
+          </div>
+          <p class="small">내 색 말만 움직일 수 있고, 내 턴일 때만 이동 가능합니다.</p>
+        </div>
+
+        <div class="box">
+          <h3>이동 로그</h3>
+          <div id="log" class="moves"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    const WS_URL = "wss://allpromotionchess.onrender.com/";
+  <div id="promoOverlay" class="overlay">
+    <div class="promo">
+      <h2>프로모션 선택</h2>
+      <p>백랭크 도착: 바꿀 기물을 선택하세요.</p>
+      <div class="promo-grid">
+        <button data-promo="q">Queen</button>
+        <button data-promo="r">Rook</button>
+        <button data-promo="b">Bishop</button>
+        <button data-promo="n">Knight</button>
+      </div>
+    </div>
+  </div>
 
-    let ws = null;
-    let mySide = null;
+<script>
+(() => {
+  const WS_URL = "wss://allpromotionchess.onrender.com";
 
-    const state = {
-      board: [],
-      turn: "white",
-      selected: null,
-      online: false
+  const boardEl = document.getElementById("board");
+  const msgEl = document.getElementById("msg");
+  const logEl = document.getElementById("log");
+  const roomChip = document.getElementById("roomChip");
+  const sideChip = document.getElementById("sideChip");
+  const turnChip = document.getElementById("turnChip");
+  const connChip = document.getElementById("connChip");
+  const roomInfo = document.getElementById("roomInfo");
+  const opponentInfo = document.getElementById("opponentInfo");
+  const promoOverlay = document.getElementById("promoOverlay");
+  const copyRoomBtn = document.getElementById("copyRoomBtn");
+  const resetSelBtn = document.getElementById("resetSelBtn");
+
+  let ws = null;
+  let roomId = new URLSearchParams(location.search).get("room") || "";
+  let mySide = "";
+  let turn = "w";
+  let selected = null;
+  let legalMoves = [];
+  let awaitingPromotion = null;
+  let opponentJoined = false;
+
+  const files = "abcdefgh";
+  const pieceMap = {
+    wp:"♙", wr:"♖", wb:"♗", wn:"♘", wq:"♕", wk:"♔",
+    bp:"♟", br:"♜", bb:"♝", bn:"♞", bq:"♛", bk:"♚"
+  };
+
+  let board = setupBoard();
+
+  function setupBoard(){
+    return [
+      ["br","bn","bb","bq","bk","bb","bn","br"],
+      ["bp","bp","bp","bp","bp","bp","bp","bp"],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["wp","wp","wp","wp","wp","wp","wp","wp"],
+      ["wr","wn","wb","wq","wk","wb","wn","wr"]
+    ];
+  }
+
+  function inBounds(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+  function colorOf(piece){ return piece ? piece[0] : ""; }
+  function typeOf(piece){ return piece ? piece[1] : ""; }
+  function coord(r,c){ return `${files[c]}${8-r}`; }
+  function enemyColor(){ return mySide === "w" ? "b" : "w"; }
+
+  function isBackRank(piece, r){
+    if(!piece) return false;
+    return piece[0] === "w" ? r === 0 : r === 7;
+  }
+
+  function setMsg(t){ msgEl.textContent = t; }
+
+  function log(t){
+    const div = document.createElement("div");
+    div.textContent = t;
+    logEl.prepend(div);
+  }
+
+  function updateStatus(){
+    roomChip.textContent = roomId ? `룸: ${roomId}` : "룸: 없음";
+    sideChip.textContent = mySide ? `내 색: ${mySide === "w" ? "White" : "Black"}` : "내 색: 미정";
+    turnChip.textContent = `턴: ${turn === "w" ? "White" : "Black"}`;
+    connChip.textContent = ws && ws.readyState === 1 ? "연결됨" : "연결 중";
+    connChip.className = "chip " + (ws && ws.readyState === 1 ? "good" : "warn");
+    roomInfo.textContent = roomId ? `룸 코드: ${roomId}` : "룸 코드 없음";
+    opponentInfo.textContent = opponentJoined ? "상대가 입장했습니다." : "상대 대기 중...";
+  }
+
+  function renderBoard(){
+    boardEl.innerHTML = "";
+    for(let r=0;r<8;r++){
+      for(let c=0;c<8;c++){
+        const sq = document.createElement("div");
+        sq.className = `sq ${(r+c)%2===0 ? "light" : "dark"}`;
+        sq.dataset.r = r;
+        sq.dataset.c = c;
+        const piece = board[r][c];
+        sq.textContent = pieceMap[piece] || "";
+        if(selected && selected.r === r && selected.c === c) sq.classList.add("sel");
+        const lm = legalMoves.find(m => m.r === r && m.c === c);
+        if(lm) sq.classList.add(lm.capture ? "cap" : "move");
+        sq.addEventListener("click", onSquareClick);
+        boardEl.appendChild(sq);
+      }
+    }
+  }
+
+  function allowedToMove(piece){
+    return piece && mySide && piece[0] === mySide;
+  }
+
+  function makeLegalMoves(r,c){
+    const piece = board[r][c];
+    if(!piece) return [];
+    const color = colorOf(piece);
+    const type = typeOf(piece);
+    const moves = [];
+    const dir = color === "w" ? -1 : 1;
+
+    const add = (rr,cc) => {
+      if(!inBounds(rr,cc)) return;
+      const target = board[rr][cc];
+      if(!target) moves.push({r:rr,c:cc,capture:false});
+      else if(colorOf(target) !== color) moves.push({r:rr,c:cc,capture:true});
     };
 
-    const unicode = {
-      wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
-      bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚"
-    };
-
-    function setStatus(text) {
-      const el = document.getElementById("status");
-      if (el) el.textContent = text;
-    }
-
-    function setInfo(text) {
-      const el = document.getElementById("info");
-      if (el) el.innerHTML = text;
-    }
-
-    function makeInitialBoard() {
-      return [
-        ["br","bn","bb","bq","bk","bb","bn","br"],
-        ["bp","bp","bp","bp","bp","bp","bp","bp"],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        [null,null,null,null,null,null,null,null],
-        ["wp","wp","wp","wp","wp","wp","wp","wp"],
-        ["wr","wn","wb","wq","wk","wb","wn","wr"]
-      ];
-    }
-
-    function resetGame() {
-      state.board = makeInitialBoard();
-      state.turn = "white";
-      state.selected = null;
-      renderBoard();
-      setStatus("게임 초기화 완료");
-    }
-
-    function renderBoard() {
-      const boardEl = document.getElementById("board");
-      boardEl.innerHTML = "";
-
-      for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-          const sq = document.createElement("div");
-          const piece = state.board[r][c];
-          sq.className = "sq " + (((r + c) % 2 === 0) ? "light" : "dark");
-          if (state.selected && state.selected.r === r && state.selected.c === c) {
-            sq.classList.add("selected");
+    if(type === "p"){
+      const nr = r + dir;
+      if(inBounds(nr,c) && !board[nr][c]) add(nr,c);
+      const startRow = color === "w" ? 6 : 1;
+      const nr2 = r + dir * 2;
+      if(r === startRow && !board[nr][c] && inBounds(nr2,c) && !board[nr2][c]) add(nr2,c);
+      for(const dc of [-1,1]){
+        const rr = r + dir, cc = c + dc;
+        if(inBounds(rr,cc) && board[rr][cc] && colorOf(board[rr][cc]) !== color) add(rr,cc);
+      }
+    } else if(type === "n"){
+      [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]].forEach(([dr,dc]) => add(r+dr,c+dc));
+    } else if(type === "b" || type === "r" || type === "q"){
+      const dirs = [];
+      if(type === "b" || type === "q") dirs.push([1,1],[1,-1],[-1,1],[-1,-1]);
+      if(type === "r" || type === "q") dirs.push([1,0],[-1,0],[0,1],[0,-1]);
+      for(const [dr,dc] of dirs){
+        let rr = r + dr, cc = c + dc;
+        while(inBounds(rr,cc)){
+          if(!board[rr][cc]) moves.push({r:rr,c:cc,capture:false});
+          else{
+            if(colorOf(board[rr][cc]) !== color) moves.push({r:rr,c:cc,capture:true});
+            break;
           }
-          sq.textContent = piece ? unicode[piece] : "";
-          sq.onclick = () => handleSquareClick(r, c);
-          boardEl.appendChild(sq);
+          rr += dr; cc += dc;
+        }
+      }
+    } else if(type === "k"){
+      for(let dr=-1; dr<=1; dr++){
+        for(let dc=-1; dc<=1; dc++){
+          if(dr || dc) add(r+dr,c+dc);
         }
       }
     }
+    return moves;
+  }
 
-    function pieceColor(piece) {
-      if (!piece) return null;
-      return piece[0] === "w" ? "white" : "black";
-    }
+  function send(obj){
+    if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+  }
 
-    function isBackRank(piece, row) {
-      if (!piece) return false;
-      const color = pieceColor(piece);
-      return (color === "white" && row === 0) || (color === "black" && row === 7);
-    }
+  function openPromotion(){ promoOverlay.classList.add("show"); }
+  function closePromotion(){ promoOverlay.classList.remove("show"); }
 
-    function handleSquareClick(r, c) {
-      const piece = state.board[r][c];
+  function applyMove(fromR, fromC, toR, toC, promotion){
+    const piece = board[fromR][fromC];
+    board[fromR][fromC] = "";
+    board[toR][toC] = promotion ? piece[0] + promotion : piece;
+    turn = enemyColor();
+    selected = null;
+    legalMoves = [];
+    renderBoard();
+    updateStatus();
+  }
 
-      if (!state.selected) {
-        if (piece && pieceColor(piece) === state.turn) {
-          state.selected = { r, c };
-          renderBoard();
-        }
-        return;
-      }
-
-      const from = state.selected;
-      const moving = state.board[from.r][from.c];
-
-      if (!moving) {
-        state.selected = null;
-        renderBoard();
-        return;
-      }
-
-      const target = state.board[r][c];
-
-      if (target && pieceColor(target) === pieceColor(moving)) {
-        state.selected = { r, c };
-        renderBoard();
-        return;
-      }
-
-      tryMove(from.r, from.c, r, c);
-      state.selected = null;
-      renderBoard();
-    }
-
-    function isLegalMoveSimple(fromR, fromC, toR, toC) {
-      const piece = state.board[fromR][fromC];
-      if (!piece) return false;
-
-      const dr = toR - fromR;
-      const dc = toC - fromC;
-      const absR = Math.abs(dr);
-      const absC = Math.abs(dc);
-      const color = pieceColor(piece);
-      const target = state.board[toR][toC];
-
-      if (target && pieceColor(target) === color) return false;
-
-      const type = piece[1];
-
-      if (type === "p") {
-        const dir = color === "white" ? -1 : 1;
-        const startRow = color === "white" ? 6 : 1;
-
-        if (dc === 0 && !target) {
-          if (dr === dir) return true;
-          if (fromR === startRow && dr === dir * 2 && !state.board[fromR + dir][fromC]) return true;
-        }
-
-        if (absC === 1 && dr === dir && target && pieceColor(target) !== color) return true;
-        return false;
-      }
-
-      if (type === "n") {
-        return (absR === 2 && absC === 1) || (absR === 1 && absC === 2);
-      }
-
-      if (type === "k") {
-        return absR <= 1 && absC <= 1;
-      }
-
-      if (type === "b" || type === "r" || type === "q") {
-        const stepR = dr === 0 ? 0 : dr > 0 ? 1 : -1;
-        const stepC = dc === 0 ? 0 : dc > 0 ? 1 : -1;
-
-        if (type === "b" && absR !== absC) return false;
-        if (type === "r" && !(dr === 0 || dc === 0)) return false;
-        if (type === "q" && !(dr === 0 || dc === 0 || absR === absC)) return false;
-
-        let rr = fromR + stepR;
-        let cc = fromC + stepC;
-        while (rr !== toR || cc !== toC) {
-          if (state.board[rr][cc]) return false;
-          rr += stepR;
-          cc += stepC;
-        }
-        return true;
-      }
-
+  function tryLocalMove(fromR, fromC, toR, toC){
+    const piece = board[fromR][fromC];
+    if(!piece) return false;
+    if(!allowedToMove(piece)) return false;
+    if(turn !== mySide){
+      setMsg("아직 내 턴이 아닙니다.");
       return false;
     }
 
-    function tryMove(fromR, fromC, toR, toC, skipSend = false) {
-      const piece = state.board[fromR][fromC];
-      if (!piece) return false;
+    const legal = makeLegalMoves(fromR, fromC);
+    const ok = legal.some(m => m.r === toR && m.c === toC);
+    if(!ok) return false;
 
-      if (!isLegalMoveSimple(fromR, fromC, toR, toC)) {
-        setStatus("불가능한 수");
-        return false;
-      }
-
-      const movingColor = pieceColor(piece);
-
-      if (movingColor !== state.turn && !skipSend) {
-        setStatus("아직 상대 차례입니다");
-        return false;
-      }
-
-      state.board[toR][toC] = piece;
-      state.board[fromR][fromC] = null;
-
-      if (piece[1] === "p") {
-        const promoRow = movingColor === "white" ? 0 : 7;
-        if (toR === promoRow) {
-          state.board[toR][toC] = movingColor[0] + "q";
-        }
-      } else {
-        if (isBackRank(piece, toR)) {
-          state.board[toR][toC] = movingColor[0] + "q";
-        }
-      }
-
-      if (!skipSend && ws && ws.readyState === WebSocket.OPEN && document.getElementById("mode").value === "online") {
-        ws.send(JSON.stringify({
-          type: "move",
-          from: { r: fromR, c: fromC },
-          to: { r: toR, c: toC },
-          piece: piece
-        }));
-      }
-
-      if (!skipSend) {
-        state.turn = state.turn === "white" ? "black" : "white";
-      }
-
-      renderBoard();
-      setStatus(`${movingColor} 이동: ${fromR},${fromC} → ${toR},${toC}`);
+    const needsPromotion = isBackRank(piece, toR) && typeOf(piece) !== "k";
+    if(needsPromotion){
+      awaitingPromotion = {fromR,fromC,toR,toC};
+      openPromotion();
+      setMsg("프로모션 기물을 선택하세요.");
       return true;
     }
 
-    function connectWS() {
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-        setStatus("이미 서버 연결 시도 중/연결됨");
+    applyMove(fromR, fromC, toR, toC, null);
+    send({ type:"move", roomId, fromR, fromC, toR, toC, promotion:null });
+    log(`${coord(fromR,fromC)} → ${coord(toR,toC)}`);
+    setMsg("이동 완료");
+    return true;
+  }
+
+  function onSquareClick(e){
+    if(awaitingPromotion) return;
+    const r = Number(e.currentTarget.dataset.r);
+    const c = Number(e.currentTarget.dataset.c);
+    const piece = board[r][c];
+
+    if(selected){
+      const moved = tryLocalMove(selected.r, selected.c, r, c);
+      if(moved) return;
+    }
+
+    if(piece && allowedToMove(piece) && turn === mySide){
+      selected = {r,c};
+      legalMoves = makeLegalMoves(r,c);
+      renderBoard();
+      return;
+    }
+
+    selected = null;
+    legalMoves = [];
+    renderBoard();
+  }
+
+  resetSelBtn.addEventListener("click", () => {
+    selected = null;
+    legalMoves = [];
+    renderBoard();
+  });
+
+  copyRoomBtn.addEventListener("click", async () => {
+    const text = roomId || "";
+    if(!text) return setMsg("룸 코드가 없습니다.");
+    try{
+      await navigator.clipboard.writeText(text);
+      setMsg("룸 코드 복사 완료");
+    }catch{
+      setMsg("복사 실패");
+    }
+  });
+
+  promoOverlay.querySelectorAll("button[data-promo]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if(!awaitingPromotion) return;
+      const promo = btn.dataset.promo;
+      const {fromR,fromC,toR,toC} = awaitingPromotion;
+      awaitingPromotion = null;
+      closePromotion();
+      applyMove(fromR, fromC, toR, toC, promo);
+      send({ type:"move", roomId, fromR, fromC, toR, toC, promotion: promo });
+      log(`${coord(fromR,fromC)} → ${coord(toR,toC)} = ${promo.toUpperCase()}`);
+      setMsg("프로모션 완료");
+    });
+  });
+
+  function connectWS(){
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      connChip.textContent = "연결됨";
+      connChip.className = "chip good";
+      setMsg("서버 연결됨...");
+      send({ type:"join_room", roomId });
+    };
+
+    ws.onclose = () => {
+      connChip.textContent = "연결 끊김";
+      connChip.className = "chip bad";
+      setMsg("연결이 끊겼습니다.");
+      updateStatus();
+    };
+
+    ws.onerror = () => {
+      setMsg("웹소켓 오류");
+    };
+
+    ws.onmessage = (ev) => {
+      let data;
+      try{ data = JSON.parse(ev.data); }catch{ return; }
+
+      if(data.type === "room_joined"){
+        roomId = data.roomId;
+        mySide = data.side;
+        turn = "w";
+        setMsg(data.message || "룸 입장 완료");
+        log(`내 색: ${mySide === "w" ? "White" : "Black"}`);
+        updateStatus();
+        renderBoard();
         return;
       }
 
-      ws = new WebSocket(WS_URL);
-
-      ws.onopen = () => {
-        setStatus("서버 연결 완료");
-      };
-
-      ws.onmessage = (event) => {
-        let data;
-        try {
-          data = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
-
-        if (data.type === "connected") {
-          setStatus("연결됨");
-        }
-
-        if (data.type === "room_joined") {
-          mySide = data.side;
-          state.online = true;
-          setStatus(`방 입장 완료 - ${data.roomId} / ${mySide}`);
-        }
-
-        if (data.type === "start_game") {
-          setStatus("게임 시작");
-        }
-
-        if (data.type === "move") {
-          if (data.from && data.to) {
-            tryMove(data.from.r, data.from.c, data.to.r, data.to.c, true);
-            state.turn = state.turn === "white" ? "black" : "white";
-            renderBoard();
-            setStatus("상대 수 적용됨");
-          }
-        }
-
-        if (data.type === "opponent_left") {
-          setStatus("상대가 나갔습니다");
-        }
-
-        if (data.type === "error") {
-          setStatus("에러: " + data.message);
-        }
-      };
-
-      ws.onclose = () => {
-        setStatus("서버 연결 종료");
-      };
-
-      ws.onerror = () => {
-        setStatus("서버 연결 오류");
-      };
-    }
-
-    function createRoom() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) connectWS();
-
-      const roomId = document.getElementById("roomId").value.trim();
-      if (!roomId) {
-        setStatus("방 ID를 입력하세요");
+      if(data.type === "opponent_joined"){
+        opponentJoined = true;
+        setMsg("상대가 입장했습니다.");
+        log("상대가 입장했습니다.");
+        updateStatus();
         return;
       }
 
-      const sendCreate = () => {
-        ws.send(JSON.stringify({
-          type: "create_room",
-          roomId
-        }));
-      };
-
-      if (ws.readyState === WebSocket.OPEN) sendCreate();
-      else ws.onopen = () => {
-        setStatus("서버 연결 완료");
-        sendCreate();
-      };
-    }
-
-    function joinRoom() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) connectWS();
-
-      const roomId = document.getElementById("roomId").value.trim();
-      if (!roomId) {
-        setStatus("방 ID를 입력하세요");
+      if(data.type === "start_game"){
+        turn = "w";
+        setMsg("게임 시작");
+        log("게임 시작");
+        updateStatus();
+        renderBoard();
         return;
       }
 
-      const sendJoin = () => {
-        ws.send(JSON.stringify({
-          type: "join_room",
-          roomId
-        }));
-      };
+      if(data.type === "move"){
+        const {fromR,fromC,toR,toC,promotion} = data;
+        const piece = board[fromR][fromC];
+        board[fromR][fromC] = "";
+        board[toR][toC] = promotion ? piece[0] + promotion : piece;
+        turn = enemyColor();
+        selected = null;
+        legalMoves = [];
+        renderBoard();
+        updateStatus();
+        log(`${coord(fromR,fromC)} → ${coord(toR,toC)}${promotion ? " = " + promotion.toUpperCase() : ""}`);
+        setMsg("상대 이동 반영됨");
+        return;
+      }
 
-      if (ws.readyState === WebSocket.OPEN) sendJoin();
-      else ws.onopen = () => {
-        setStatus("서버 연결 완료");
-        sendJoin();
-      };
-    }
+      if(data.type === "room_full"){
+        setMsg("룸이 가득 찼습니다.");
+        log("룸 가득");
+        return;
+      }
 
-    function analyzePosition() {
-      setStatus("분석 기능은 아직 연결되지 않았습니다");
-    }
+      if(data.type === "error"){
+        setMsg(data.message || "오류");
+        return;
+      }
+    };
+  }
 
-    resetGame();
-  </script>
+  function init(){
+    renderBoard();
+    updateStatus();
+    connectWS();
+  }
+
+  init();
+})();
+</script>
 </body>
 </html>
