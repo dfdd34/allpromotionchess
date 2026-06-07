@@ -1,612 +1,283 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>All Promotion Chess</title>
-  <style>
-    :root {
-      --bg: #111;
-      --panel: #1c1c1c;
-      --panel2: #222;
-      --text: #f2f2f2;
-      --muted: #aaa;
-      --accent: #4caf50;
-      --accent2: #2196f3;
-      --danger: #e53935;
-      --border: #333;
-      --lightSq: #ddd;
-      --darkSq: #769656;
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      overflow-x: hidden;
-    }
-
-    #app {
-      width: 100%;
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 12px;
-    }
-
-    h1 {
-      margin: 8px 0 12px;
-      font-size: 22px;
-      text-align: center;
-    }
-
-    #topbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 12px;
-    }
-
-    .chip {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      font-size: 13px;
-      color: var(--text);
-    }
-
-    .chip strong { color: #fff; }
-
-    #joinPanel {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-    }
-
-    #roomInput {
-      width: min(100%, 220px);
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--panel2);
-      color: var(--text);
-      outline: none;
-      font-size: 16px;
-      text-transform: uppercase;
-    }
-
-    button {
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: none;
-      font-size: 15px;
-      cursor: pointer;
-      color: #fff;
-    }
-
-    #createBtn { background: var(--accent); }
-    #joinBtn { background: var(--accent2); }
-    #leaveBtn { background: var(--danger); }
-    #copyBtn { background: #444; }
-
-    #status {
-      text-align: center;
-      margin-bottom: 10px;
-      min-height: 20px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    #boardWrap {
-      display: flex;
-      justify-content: center;
-      margin-top: 8px;
-    }
-
-    #board {
-      width: min(92vw, 640px);
-      aspect-ratio: 1 / 1;
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      grid-template-rows: repeat(8, 1fr);
-      border: 2px solid #555;
-      touch-action: manipulation;
-      user-select: none;
-    }
-
-    .sq {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(22px, 6vw, 44px);
-      cursor: pointer;
-      position: relative;
-    }
-
-    .light { background: var(--lightSq); }
-    .dark { background: var(--darkSq); }
-
-    .selected {
-      outline: 3px solid gold;
-      outline-offset: -3px;
-    }
-
-    .hint::after {
-      content: "";
-      width: 18%;
-      height: 18%;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.28);
-      position: absolute;
-    }
-
-    #promoOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 16px;
-    }
-
-    #promoBox {
-      width: min(92vw, 360px);
-      background: #1b1b1b;
-      border: 1px solid #444;
-      border-radius: 16px;
-      padding: 18px;
-      text-align: center;
-    }
-
-    #promoBox h2 {
-      margin: 0 0 14px;
-      font-size: 20px;
-    }
-
-    .promoBtns {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-
-    .promoBtn {
-      padding: 14px 10px;
-      border: none;
-      border-radius: 12px;
-      background: #333;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .promoBtn:hover { background: #444; }
-
-    .small {
-      font-size: 12px;
-      color: #aaa;
-    }
-
-    @media (max-width: 480px) {
-      h1 { font-size: 18px; }
-      #roomInput, #createBtn, #joinBtn, #leaveBtn, #copyBtn { width: 100%; }
-      #joinPanel { flex-direction: column; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>옴니-프로모션 체스</title>
+<style>
+    body{margin:0;font-family:system-ui,Apple SD Gothic Neo,Segoe UI,sans-serif;text-align:center;background:#fafafa;color:#333}
+    h1{margin:12px 0;font-weight:700;font-size:1.6rem}
+    #connection{margin-bottom:8px}
+    #connection input{padding:4px 6px;font-size:1rem;width:110px}
+    #connection button{padding:4px 10px;margin-left:4px;font-size:1rem;cursor:pointer}
+    #status{display:inline-block;width:10px;height:10px;margin-left:8px;border-radius:50%;background:#ccc;vertical-align:middle}
+    #status.online{background:#2ecc71}
+    #status.offline{background:#e74c3c}
+    canvas{background:#fff;border:2px solid #333;touch-action:none}
+    /* 승급 모달 */
+    #promo{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+           backdrop-filter:blur(3px);background:rgba(0,0,0,.45);z-index:10}
+    #promo.hidden{display:none}
+    #promo p{color:#fff;margin-bottom:12px;font-size:1.2rem;font-weight:600}
+    #promo button{padding:8px 16px;margin:4px;font-size:1rem;width:90px;cursor:pointer}
+</style>
 </head>
 <body>
-  <div id="app">
-    <h1>All Promotion Chess</h1>
+<h1>옴니-프로모션 체스</h1>
 
-    <div id="topbar">
-      <div class="chip">룸: <strong id="roomLabel">-</strong></div>
-      <div class="chip">내 색: <strong id="sideLabel">-</strong></div>
-      <div class="chip">턴: <strong id="turnLabel">-</strong></div>
-      <div class="chip">상태: <strong id="connLabel">연결 안 됨</strong></div>
+<div id="connection">
+    <label>
+        방 코드&nbsp;
+        <input id="room" placeholder="예: ABC123" />
+    </label>
+    <button id="create">방 만들기</button>
+    <button id="join">입장</button>
+    <span id="status" class="offline"></span>
+</div>
+
+<canvas id="board" width="480" height="480"></canvas>
+
+<!-- 승급 모달 -->
+<div id="promo" class="hidden">
+    <p>어떤 기물로 승급하시겠습니까?</p>
+    <div>
+        <button data-piece="q">퀸</button>
+        <button data-piece="r">룩</button>
+        <button data-piece="b">비숍</button>
+        <button data-piece="n">나이트</button>
     </div>
+</div>
 
-    <div id="joinPanel">
-      <input id="roomInput" type="text" placeholder="룸코드 입력" maxlength="12" />
-      <button id="createBtn">룸 만들기</button>
-      <button id="joinBtn">룸 입장</button>
-      <button id="copyBtn">룸코드 복사</button>
-      <button id="leaveBtn">나가기</button>
-    </div>
-
-    <div id="status">룸을 만들거나, 룸코드를 입력하고 입장하세요.</div>
-
-    <div id="boardWrap">
-      <div id="board"></div>
-    </div>
-  </div>
-
-  <div id="promoOverlay">
-    <div id="promoBox">
-      <h2>프로모션 선택</h2>
-      <div class="promoBtns">
-        <button class="promoBtn" data-promo="q">Queen</button>
-        <button class="promoBtn" data-promo="r">Rook</button>
-        <button class="promoBtn" data-promo="b">Bishop</button>
-        <button class="promoBtn" data-promo="n">Knight</button>
-      </div>
-      <p class="small">승격할 말을 선택하세요.</p>
-    </div>
-  </div>
-
-  <script>
-    const WS_URL = "wss://allpromotionchess.onrender.com";
-
-    const boardEl = document.getElementById("board");
-    const statusEl = document.getElementById("status");
-    const roomLabel = document.getElementById("roomLabel");
-    const sideLabel = document.getElementById("sideLabel");
-    const turnLabel = document.getElementById("turnLabel");
-    const connLabel = document.getElementById("connLabel");
-    const roomInput = document.getElementById("roomInput");
-    const promoOverlay = document.getElementById("promoOverlay");
-
-    const createBtn = document.getElementById("createBtn");
-    const joinBtn = document.getElementById("joinBtn");
-    const leaveBtn = document.getElementById("leaveBtn");
-    const copyBtn = document.getElementById("copyBtn");
-
-    const U = {
-      w: { k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙" },
-      b: { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" }
-    };
-
-    let ws = null;
-    let connected = false;
-    let roomId = "";
-    let mySide = "";
-    let turn = "w";
-    let selected = null;
-    let legalMoves = [];
-    let awaitingPromotion = null;
-
-    const initialBoard = () => ([
-      ["br","bn","bb","bq","bk","bb","bn","br"],
-      ["bp","bp","bp","bp","bp","bp","bp","bp"],
-      [null,null,null,null,null,null,null,null],
-      [null,null,null,null,null,null,null,null],
-      [null,null,null,null,null,null,null,null],
-      [null,null,null,null,null,null,null,null],
-      ["wp","wp","wp","wp","wp","wp","wp","wp"],
-      ["wr","wn","wb","wq","wk","wb","wn","wr"]
-    ]);
-
-    let board = initialBoard();
-
-    function setStatus(msg) { statusEl.textContent = msg; }
-    function setConn(msg) { connLabel.textContent = msg; }
-    function setRoomLabel(msg) { roomLabel.textContent = msg; }
-    function setSideLabel(msg) { sideLabel.textContent = msg; }
-    function setTurnLabel(msg) { turnLabel.textContent = msg; }
-
-    function send(obj) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(obj));
-      }
-    }
-
-    function connect() {
-      setConn("연결 중");
-      ws = new WebSocket(WS_URL);
-
-      ws.onopen = () => {
-        connected = true;
-        setConn("연결됨");
-        setStatus("서버 연결 완료.");
-      };
-
-      ws.onclose = (e) => {
-        connected = false;
-        setConn("끊김");
-        setStatus(`연결이 끊겼습니다. code=${e.code}`);
-      };
-
-      ws.onerror = () => {
-        setConn("오류");
-        setStatus("웹소켓 연결 오류");
-      };
-
-      ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-
-        if (data.type === "room_joined") {
-          roomId = data.roomId;
-          mySide = data.side;
-          setRoomLabel(roomId);
-          setSideLabel(mySide === "w" ? "White" : "Black");
-          roomInput.value = roomId;
-          setStatus(data.message + ": " + data.roomId);
-          return;
-        }
-
-        if (data.type === "room_full") {
-          setStatus("방이 가득 찼습니다. " + data.roomId);
-          return;
-        }
-
-        if (data.type === "start_game") {
-          setStatus("게임 시작!");
-          return;
-        }
-
-        if (data.type === "opponent_joined") {
-          setStatus("상대가 입장했습니다.");
-          return;
-        }
-
-        if (data.type === "opponent_left") {
-          setStatus("상대가 나갔습니다.");
-          return;
-        }
-
-        if (data.type === "move") {
-          applyRemoteMove(data);
-          return;
-        }
-
-        if (data.type === "sync_state") {
-          if (data.state && data.state.board) {
-            board = data.state.board;
-            turn = data.state.turn || turn;
-            render();
-          }
-        }
-      };
-    }
-
-    function joinRoom(mode) {
-      if (!connected) {
-        setStatus("먼저 서버에 연결되어야 합니다.");
-        return;
-      }
-      const code = roomInput.value.trim().toUpperCase();
-      send({
-        type: mode === "create" ? "create_room" : "join_room",
-        roomId: mode === "create" ? "" : code
-      });
-    }
-
-    function leaveRoom() {
-      send({ type: "leave_room" });
-      roomId = "";
-      mySide = "";
-      setRoomLabel("-");
-      setSideLabel("-");
-      setStatus("방에서 나왔습니다.");
-    }
-
-    function copyRoomCode() {
-      const code = roomId || roomInput.value.trim();
-      if (!code) {
-        setStatus("복사할 룸코드가 없습니다.");
-        return;
-      }
-      navigator.clipboard.writeText(code).then(() => {
-        setStatus("룸코드가 복사되었습니다.");
-      });
-    }
-
-    createBtn.addEventListener("click", () => joinRoom("create"));
-    joinBtn.addEventListener("click", () => joinRoom("join"));
-    leaveBtn.addEventListener("click", leaveRoom);
-    copyBtn.addEventListener("click", copyRoomCode);
-
-    function inBounds(r, c) {
-      return r >= 0 && r < 8 && c >= 0 && c < 8;
-    }
-
-    function colorOf(piece) { return piece ? piece[0] : null; }
-    function typeOf(piece) { return piece ? piece[1] : null; }
-
-    function allowedToMove(piece) {
-      if (!piece || !mySide) return false;
-      return colorOf(piece) === mySide && turn === mySide;
-    }
-
-    function isBackRank(piece, row) {
-      if (!piece) return false;
-      const c = colorOf(piece);
-      return (c === "w" && row === 0) || (c === "b" && row === 7);
-    }
-
-    function cloneBoard(b) {
-      return b.map(row => row.slice());
-    }
-
-    function makeLegalMoves(r, c) {
-      const piece = board[r][c];
-      if (!piece) return [];
-      const col = colorOf(piece);
-      const type = typeOf(piece);
-      const dir = col === "w" ? -1 : 1;
-      const moves = [];
-
-      const push = (rr, cc) => {
-        if (!inBounds(rr, cc)) return;
-        const target = board[rr][cc];
-        if (!target || colorOf(target) !== col) moves.push([rr, cc]);
-      };
-
-      if (type === "p") {
-        const one = r + dir;
-        if (inBounds(one, c) && !board[one][c]) {
-          moves.push([one, c]);
-          const start = col === "w" ? 6 : 1;
-          const two = r + dir * 2;
-          if (r === start && !board[two][c]) moves.push([two, c]);
-        }
-        for (const dc of [-1, 1]) {
-          const rr = r + dir, cc = c + dc;
-          if (!inBounds(rr, cc)) continue;
-          const t = board[rr][cc];
-          if (t && colorOf(t) !== col) moves.push([rr, cc]);
-        }
-      } else if (type === "n") {
-        [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc]) => push(r+dr,c+dc));
-      } else if (type === "b" || type === "r" || type === "q") {
-        const dirs = [];
-        if (type === "b" || type === "q") dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
-        if (type === "r" || type === "q") dirs.push([-1,0],[1,0],[0,-1],[0,1]);
-        for (const [dr, dc] of dirs) {
-          let rr = r + dr, cc = c + dc;
-          while (inBounds(rr, cc)) {
-            if (!board[rr][cc]) {
-              moves.push([rr, cc]);
-            } else {
-              if (colorOf(board[rr][cc]) !== col) moves.push([rr, cc]);
-              break;
+<script>
+/* ======================= 설정 ======================= */
+const WS_URL = "wss://allpromotionchess  .onrender.com";    // ← 실제 Render WebSocket 엔드포인트로 교체하세요
+const TILE   = 60;                                      // 한 칸 60px (8*60=480)
+/* ===================== 유틸 함수 ===================== */
+function $(id){return document.getElementById(id);}
+function send(ws,obj){ws.readyState===1&&ws.send(JSON.stringify(obj));}
+function status(on){$("status").className = on ? "online" : "offline";}
+/* ============== 체스 엔진 (경량/자체 구현) ============== */
+class Chess{
+    constructor(fen=Chess.START_FEN){this.load(fen);}
+    /* ------------ FEN 파싱/직렬화 ------------ */
+    load(fen){
+        const parts=fen.trim().split(/\s+/);
+        if(parts.length<2)throw Error("잘못된 FEN");
+        this.board=[...Array(8)].map(()=>Array(8).fill(null));
+        let [rows,turn]=parts;
+        rows.split("/").forEach((row,y)=>{
+            let x=0;
+            for(const c of row){
+                if(/\d/.test(c)){x+=+c;continue;}
+                this.board[y][x++]=c;
             }
-            rr += dr; cc += dc;
-          }
-        }
-      } else if (type === "k") {
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            if (dr === 0 && dc === 0) continue;
-            push(r + dr, c + dc);
-          }
-        }
-      }
-      return moves;
-    }
-
-    function render() {
-      boardEl.innerHTML = "";
-      for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-          const sq = document.createElement("div");
-          sq.className = "sq " + (((r + c) % 2 === 0) ? "light" : "dark");
-          sq.dataset.r = r;
-          sq.dataset.c = c;
-
-          const piece = board[r][c];
-          if (piece) sq.textContent = U[colorOf(piece)][typeOf(piece)];
-
-          if (selected && selected.r === r && selected.c === c) sq.classList.add("selected");
-          if (legalMoves.some(([rr, cc]) => rr === r && cc === c)) sq.classList.add("hint");
-
-          sq.addEventListener("click", onSquareClick);
-          boardEl.appendChild(sq);
-        }
-      }
-      setTurnLabel(turn === "w" ? "White" : "Black");
-    }
-
-    function onSquareClick(e) {
-      const r = +e.currentTarget.dataset.r;
-      const c = +e.currentTarget.dataset.c;
-      const piece = board[r][c];
-
-      if (awaitingPromotion) return;
-
-      if (selected) {
-        const canMoveHere = legalMoves.some(([rr, cc]) => rr === r && cc === c);
-        if (canMoveHere) {
-          movePiece(selected.r, selected.c, r, c);
-          selected = null;
-          legalMoves = [];
-          render();
-          return;
-        }
-      }
-
-      if (piece && allowedToMove(piece)) {
-        selected = { r, c };
-        legalMoves = makeLegalMoves(r, c);
-        render();
-      } else {
-        selected = null;
-        legalMoves = [];
-        render();
-      }
-    }
-
-    function movePiece(fr, fc, tr, tc) {
-      const piece = board[fr][fc];
-      const next = cloneBoard(board);
-      next[tr][tc] = piece;
-      next[fr][fc] = null;
-
-      const needsPromotion =
-        piece &&
-        typeOf(piece) !== "k" &&
-        ["p","r","b","n"].includes(typeOf(piece)) &&
-        isBackRank(piece, tr);
-
-      if (needsPromotion) {
-        awaitingPromotion = { fr, fc, tr, tc, piece };
-        promoOverlay.style.display = "flex";
-        return;
-      }
-
-      board = next;
-      turn = turn === "w" ? "b" : "w";
-      render();
-      send({ type: "move", from: { r: fr, c: fc }, to: { r: tr, c: tc }, piece, turn });
-      send({ type: "sync_state", state: { board, turn } });
-    }
-
-    document.querySelectorAll(".promoBtn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (!awaitingPromotion) return;
-        const promo = btn.dataset.promo;
-        const { fr, fc, tr, tc, piece } = awaitingPromotion;
-
-        const next = cloneBoard(board);
-        next[tr][tc] = colorOf(piece) + promo;
-        next[fr][fc] = null;
-
-        board = next;
-        turn = turn === "w" ? "b" : "w";
-        awaitingPromotion = null;
-        promoOverlay.style.display = "none";
-        render();
-
-        send({
-          type: "move",
-          from: { r: fr, c: fc },
-          to: { r: tr, c: tc },
-          piece,
-          promotion: promo,
-          turn
         });
-
-        send({ type: "sync_state", state: { board, turn } });
-      });
-    });
-
-    function applyRemoteMove(data) {
-      if (!data.from || !data.to) return;
-      const fr = data.from.r, fc = data.from.c;
-      const tr = data.to.r, tc = data.to.c;
-      const piece = board[fr][fc];
-      if (!piece) return;
-
-      const next = cloneBoard(board);
-      next[tr][tc] = data.promotion ? (colorOf(piece) + data.promotion) : piece;
-      next[fr][fc] = null;
-
-      board = next;
-      turn = data.turn || (turn === "w" ? "b" : "w");
-      selected = null;
-      legalMoves = [];
-      awaitingPromotion = null;
-      promoOverlay.style.display = "none";
-      render();
+        this.turn=turn;
     }
-
-    render();
+    fen(){
+        const rows=this.board.map(r=>{
+            let s="",cnt=0;
+            r.forEach(p=>{
+                if(!p)cnt++;
+                else{ if(cnt){s+=cnt;cnt=0;} s+=p;}
+            });
+            return cnt?s+cnt:s;
+        }).join("/");
+        return `${rows} ${this.turn}`;
+    }
+    /* ------------ 내부 헬퍼 ------------ */
+    inBounds(x,y){return x>=0&&x<8&&y>=0&&y<8;}
+    pieceColor(p){return p===p?.toUpperCase()?"w":"b";}
+    dir(a){return a==="w"?-1:1;}          // 폰 진행 방향
+    isBackRank(y,color){return color==="w"?y===0:y===7;}
+    cloneBoard(){return this.board.map(r=>r.slice());}
+    /* ------------ 이동 유효성 검사 ------------ */
+    canMove(sx,sy,tx,ty){
+        if(!this.inBounds(sx,sy)||!this.inBounds(tx,ty))return false;
+        const p=this.board[sy][sx];
+        if(!p||this.pieceColor(p)!==this.turn)return false;
+        const target=this.board[ty][tx];
+        if(target&&this.pieceColor(target)===this.turn)return false;
+        const dx=tx-sx, dy=ty-sy, adx=Math.abs(dx), ady=Math.abs(dy);
+        switch(p.toLowerCase()){
+            case "p":{                             // 폰
+                if(dx===0&&target)return false;
+                if(dx===0&&dy===this.dir(this.turn)&&!target)return true;
+                if(adx===1&&dy===this.dir(this.turn)&&target)return true;
+                return false;
+            }
+            case "n": return adx*ady===2;          // 나이트
+            case "b": return adx===ady&&this.clearDiag(sx,sy,tx,ty);
+            case "r": return (dx===0||dy===0)&&this.clearLine(sx,sy,tx,ty);
+            case "q": return (adx===ady?this.clearDiag(sx,sy,tx,ty): (dx===0||dy===0)&&this.clearLine(sx,sy,tx,ty));
+            case "k": return Math.max(adx,ady)===1;
+        }
+        return false;
+    }
+    clearLine(sx,sy,tx,ty){
+        const stepX=Math.sign(tx-sx), stepY=Math.sign(ty-sy);
+        for(let x=sx+stepX,y=sy+stepY; x!==tx||y!==ty; x+=stepX,y+=stepY){
+            if(this.board[y][x])return false;
+        }
+        return true;
+    }
+    clearDiag(...a){return this.clearLine(...a);}
+    /* ------------ 실제 이동 처리 ------------ */
+    moveCoords(sx,sy,tx,ty){
+        if(!this.canMove(sx,sy,tx,ty))return {ok:false};
+        const piece=this.board[sy][sx];
+        const next=this.cloneBoard();
+        next[sy][sx]=null;
+        next[ty][tx]=piece;
+        // 승급(왕 제외, 퀸/룩/비숍/나이트 선택)
+        let promo=null;
+        if(["p","r","b","n"].includes(piece.toLowerCase()) && this.isBackRank(ty,this.turn)){
+            promo=true;
+        }
+        // 턴 전환
+        const tmpTurn=this.turn==="w"?"b":"w";
+        const newFen=new Chess().fen; // placeholder, replaced below
+        const inst=new Chess();
+        inst.board=next;
+        inst.turn=tmpTurn;
+        return{ok:true,fen:inst.fen(),promo};
+    }
+    promote(x,y,choice,color){
+        const chosen=color==="w"?choice.toUpperCase():choice.toLowerCase();
+        this.board[y][x]=chosen;
+        this.turn=color==="w"?"b":"w";
+    }
+}
+Chess.START_FEN="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+/* ===================== 전역 변수 ===================== */
+let chess   = new Chess();
+let socket  = null;
+let myColor = "w";
+let roomId  = "";
+let dragging = null;
+/* ================ 캔버스 렌더링 ================= */
+const ctx = $("board").getContext("2d");
+const img = new Image();
+img.src = "https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/128.png"; // 무료 피스 세트
+img.onload = draw;
+function draw(){
+    ctx.clearRect(0,0,480,480);
+    // 바둑판
+    for(let y=0;y<8;y++){
+        for(let x=0;x<8;x++){
+            ctx.fillStyle=(x+y)&1?"#769656":"#eeeed2";
+            ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+        }
+    }
+    // 기물
+    for(let y=0;y<8;y++){
+        for(let x=0;x<8;x++){
+            const p=chess.board[y][x];
+            if(!p)continue;
+            if(dragging&&dragging.from.x===x&&dragging.from.y===y)continue;
+            drawPiece(p,x,y);
+        }
+    }
+    // 드래그 중 그림자
+    if(dragging){
+        const {mx,my}=dragging;
+        ctx.globalAlpha=0.8;
+        drawPiece(dragging.piece,(mx-30)/TILE,(my-30)/TILE,true);
+        ctx.globalAlpha=1;
+    }
+}
+function drawPiece(p,x,y,byPixel=false){
+    const base={k:0,q:1,r:2,b:3,n:4,p:5};
+    const col=p===p.toUpperCase()?0:1;
+    const row=base[p.toLowerCase()];
+    const sx=row*128, sy=col*128;
+    const dx=byPixel?x*TILE:x*TILE, dy=byPixel?y*TILE:y*TILE;
+    ctx.drawImage(img,sx,sy,128,128,dx,dy,TILE,TILE);
+}
+/* ============== 마우스 인터랙션 ============== */
+$("board").addEventListener("mousedown",e=>{
+    const rect=e.target.getBoundingClientRect();
+    const x=Math.floor((e.clientX-rect.left)/TILE);
+    const y=Math.floor((e.clientY-rect.top )/TILE);
+    const p=chess.board[y][x];
+    if(!p||chess.pieceColor(p)!==myColor)return;
+    dragging={from:{x,y},piece:p,mx:e.clientX-rect.left,my:e.clientY-rect.top};
+});
+$("board").addEventListener("mousemove",e=>{
+    if(!dragging)return;
+    const rect=e.target.getBoundingClientRect();
+    dragging.mx=e.clientX-rect.left;
+    dragging.my=e.clientY-rect.top;
+    draw();
+});
+$("board").addEventListener("mouseup",e=>{
+    if(!dragging)return;
+    const rect=e.target.getBoundingClientRect();
+    const tx=Math.floor((e.clientX-rect.left)/TILE);
+    const ty=Math.floor((e.clientY-rect.top )/TILE);
+    const move=chess.moveCoords(dragging.from.x,dragging.from.y,tx,ty);
+    dragging=null;
+    draw();
+    if(move.ok){
+        if(move.promo){
+            showPromo(move,tx,ty);
+        }else{
+            chess.load(move.fen);
+            pushMove(move.fen);
+            draw();
+        }
+    }
+});
+/* ================ 승급 처리 ================ */
+function showPromo(move,x,y){
+    const modal=$("promo");
+    modal.classList.remove("hidden");
+    modal.querySelectorAll("button").forEach(btn=>{
+        btn.onclick=()=>{
+            modal.classList.add("hidden");
+            chess.promote(x,y,btn.dataset.piece,myColor);
+            const newFen=chess.fen();
+            pushMove(newFen);
+            draw();
+        };
+    });
+}
+/* =============== 네트워크 =============== */
+function connect(){
+    socket=new WebSocket(WS_URL);
+    socket.onopen = ()=>status(true);
+    socket.onclose=()=>status(false);
+    socket.onmessage=e=>{
+        let msg;
+        try{msg=JSON.parse(e.data);}catch{console.warn("JSON 파싱 실패",e.data);return;}
+        if(msg.type==="sync_state"){
+            chess.load(msg.fen);
+            myColor=msg.color;
+            draw();
+        }
+    };
+}
+function pushMove(fen){
+    send(socket,{type:"sync_state",room:roomId,fen});
+}
+/* ============= 방 생성 / 입장 ============= */
+$("create").onclick = ()=>{
+    if(socket)socket.close();
+    roomId=$("room").value.trim().toUpperCase()||Math.random().toString(36).substr(2,6).toUpperCase();
+    $("room").value=roomId;
     connect();
-  </script>
+    send(socket,{type:"create",room:roomId});
+    alert(`방이 생성되었습니다.\n코드: ${roomId}`);
+};
+$("join").onclick = ()=>{
+    roomId=$("room").value.trim().toUpperCase();
+    if(!roomId)return alert("방 코드를 입력하세요.");
+    if(socket)socket.close();
+    connect();
+    send(socket,{type:"join",room:roomId});
+};
+/* 최초 연결 상태표시 */
+status(false);
+</script>
 </body>
 </html>
