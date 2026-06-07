@@ -1,156 +1,153 @@
-const WebSocket = require("ws");
+const WS_URL = "wss://YOUR-RENDER-SERVICE.onrender.com";
 
-const PORT = process.env.PORT || 3000;
-const wss = new WebSocket.Server({ port: PORT });
+const ws = new WebSocket(WS_URL);
 
-const rooms = new Map();
+let roomId = "";
+let mySide = "";
+let board = null;
+let turn = "w";
 
-function send(ws, data) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
+function setStatus(msg) {
+  const el = document.getElementById("status");
+  if (el) el.textContent = msg;
+}
+
+function setRoomLabel(id) {
+  const el = document.getElementById("roomLabel");
+  if (el) el.textContent = id || "-";
+}
+
+function setSideLabel(sideText) {
+  const el = document.getElementById("sideLabel");
+  if (el) el.textContent = sideText || "-";
+}
+
+function send(data) {
+  if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
   }
 }
 
-function broadcast(roomId, data) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-  for (const p of room.players) send(p.ws, data);
-}
+ws.onopen = () => {
+  setStatus("서버 연결됨");
+};
 
-function normalizeRoomId(roomId) {
-  if (typeof roomId !== "string") return "";
-  return roomId.trim().toUpperCase();
-}
+ws.onerror = () => {
+  setStatus("WebSocket 오류");
+};
 
-function makeRoomId() {
-  let id = "";
-  do {
-    id = Math.random().toString(36).slice(2, 8).toUpperCase();
-  } while (rooms.has(id));
-  return id;
-}
+ws.onclose = () => {
+  setStatus("연결 종료");
+};
 
-function createOrJoinRoom(ws, rawRoomId) {
-  let roomId = normalizeRoomId(rawRoomId);
-  if (!roomId) roomId = makeRoomId();
+ws.onmessage = (e) => {
+  let data;
 
-  let room = rooms.get(roomId);
-  let created = false;
-
-  if (!room) {
-    room = {
-      players: [],
-      state: null,
-      started: false
-    };
-    rooms.set(roomId, room);
-    created = true;
-  }
-
-  if (room.players.length >= 2) {
-    send(ws, { type: "room_full", roomId });
+  try {
+    data = JSON.parse(e.data);
+  } catch (err) {
+    console.warn("JSON 아님:", e.data);
+    setStatus("JSON이 아닌 메시지 수신: " + e.data);
     return;
   }
 
-  const side = room.players.length === 0 ? "w" : "b";
-  room.players.push({ ws, side });
-  ws.roomId = roomId;
-  ws.side = side;
-
-  send(ws, {
-    type: "room_joined",
-    roomId,
-    side,
-    created,
-    message: created ? "룸 생성 완료" : "룸 입장 완료"
-  });
-
-  if (room.players.length === 2) {
-    room.started = true;
-    broadcast(roomId, { type: "start_game", roomId });
-  }
-}
-
-function leaveRoom(ws) {
-  const roomId = ws.roomId;
-  if (!roomId) return;
-
-  const room = rooms.get(roomId);
-  if (!room) return;
-
-  room.players = room.players.filter(p => p.ws !== ws);
-
-  if (room.players.length === 0) {
-    rooms.delete(roomId);
-  } else {
-    broadcast(roomId, { type: "opponent_left" });
+  if (data.type === "connected") {
+    setStatus("서버와 연결되었습니다");
+    return;
   }
 
-  ws.roomId = null;
-  ws.side = null;
+  if (data.type === "room_joined") {
+    alert("room_joined 수신: " + data.roomId);
+    roomId = data.roomId;
+    mySide = data.side;
+
+    setRoomLabel(roomId);
+    setSideLabel(mySide === "w" ? "White" : "Black");
+    setStatus(data.message + " / " + data.roomId);
+
+    const roomInput = document.getElementById("roomInput");
+    if (roomInput) roomInput.value = roomId;
+
+    if (data.state && data.state.board) {
+      board = data.state.board;
+      turn = data.state.turn || turn;
+      renderBoard();
+    }
+
+    return;
+  }
+
+  if (data.type === "room_full") {
+    alert("방이 가득 찼습니다");
+    setStatus("방이 가득 찼습니다");
+    return;
+  }
+
+  if (data.type === "start_game") {
+    alert("게임 시작");
+    setStatus("게임 시작");
+    return;
+  }
+
+  if (data.type === "opponent_left") {
+    alert("상대가 나갔습니다");
+    setStatus("상대가 나갔습니다");
+    return;
+  }
+
+  if (data.type === "sync_state") {
+    if (data.state) {
+      board = data.state.board;
+      turn = data.state.turn || turn;
+      renderBoard();
+      setStatus("상태 동기화 완료");
+    }
+    return;
+  }
+
+  if (data.type === "move") {
+    applyRemoteMove(data);
+    return;
+  }
+
+  if (data.type === "chat") {
+    console.log("chat:", data.text);
+    return;
+  }
+
+  if (data.type === "error") {
+    console.warn("서버 에러:", data.message);
+    setStatus(data.message);
+    return;
+  }
+
+  console.log("알 수 없는 메시지:", data);
+};
+
+function createRoom() {
+  alert("Create Room 버튼 클릭");
+  send({ type: "create_room" });
+  setStatus("방 생성 요청 전송");
 }
 
-wss.on("connection", (ws) => {
-  ws.roomId = null;
-  ws.side = null;
+function joinRoom() {
+  const roomInput = document.getElementById("roomInput");
+  const inputRoomId = roomInput ? roomInput.value.trim().toUpperCase() : "";
 
-  send(ws, { type: "connected" });
+  if (!inputRoomId) {
+    alert("방 코드를 입력하세요");
+    return;
+  }
 
-  ws.on("message", (message) => {
-    let data;
-    try {
-      data = JSON.parse(message.toString());
-    } catch {
-      return;
-    }
+  alert("Join Room 클릭: " + inputRoomId);
+  send({ type: "join_room", roomId: inputRoomId });
+  setStatus("방 입장 요청 전송: " + inputRoomId);
+}
 
-    if (data.type === "create_room") {
-      createOrJoinRoom(ws, "");
-      return;
-    }
+function renderBoard() {
+  console.log("renderBoard()", board, turn);
+}
 
-    if (data.type === "join_room") {
-      createOrJoinRoom(ws, data.roomId);
-      return;
-    }
-
-    if (data.type === "leave_room") {
-      leaveRoom(ws);
-      return;
-    }
-
-    if (data.type === "move") {
-      const roomId = ws.roomId;
-      if (!roomId) return;
-      broadcast(roomId, {
-        type: "move",
-        from: data.from,
-        to: data.to,
-        promotion: data.promotion || null,
-        piece: data.piece || null,
-        turn: data.turn || null
-      });
-      return;
-    }
-
-    if (data.type === "sync_state") {
-      const roomId = ws.roomId;
-      if (!roomId) return;
-      const room = rooms.get(roomId);
-      if (!room) return;
-
-      room.state = data.state || null;
-      broadcast(roomId, {
-        type: "sync_state",
-        state: room.state
-      });
-      return;
-    }
-  });
-
-  ws.on("close", () => {
-    leaveRoom(ws);
-  });
-});
-
-console.log(`WebSocket server running on port ${PORT}`);
+function applyRemoteMove(data) {
+  console.log("applyRemoteMove", data);
+}
