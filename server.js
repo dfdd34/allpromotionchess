@@ -1,38 +1,40 @@
-const http = require("http");
 const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 3000;
-const server = http.createServer();
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ port: PORT });
 
-const rooms = new Map(); 
-// roomId -> { players: [{ws, side}], started: bool }
+const rooms = new Map();
 
-function send(ws, obj) {
+function send(ws, data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(obj));
+    ws.send(JSON.stringify(data));
   }
 }
 
-function broadcast(roomId, obj, exceptWs = null) {
+function broadcast(roomId, data) {
   const room = rooms.get(roomId);
   if (!room) return;
   for (const p of room.players) {
-    if (p.ws && p.ws.readyState === WebSocket.OPEN && p.ws !== exceptWs) {
-      p.ws.send(JSON.stringify(obj));
-    }
+    send(p.ws, data);
   }
 }
 
+function makeRoomId() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
 function joinRoom(ws, roomId) {
-  if (!roomId || typeof roomId !== "string") {
-    send(ws, { type: "error", message: "roomId가 필요합니다." });
-    return;
+  if (!roomId || typeof roomId !== "string" || !roomId.trim()) {
+    roomId = makeRoomId();
   }
 
   let room = rooms.get(roomId);
   if (!room) {
-    room = { players: [], started: false };
+    room = {
+      players: [],
+      started: false,
+      state: null
+    };
     rooms.set(roomId, room);
   }
 
@@ -42,6 +44,7 @@ function joinRoom(ws, roomId) {
   }
 
   const side = room.players.length === 0 ? "w" : "b";
+
   room.players.push({ ws, side });
   ws.roomId = roomId;
   ws.side = side;
@@ -50,22 +53,17 @@ function joinRoom(ws, roomId) {
     type: "room_joined",
     roomId,
     side,
-    message: side === "w" ? "화이트로 입장했습니다." : "블랙으로 입장했습니다."
+    message: side === "w" ? "새 룸 생성 완료" : "룸에 참가 완료"
   });
 
   if (room.players.length === 2) {
-    const p1 = room.players[0];
-    const p2 = room.players[1];
-
-    send(p1.ws, { type: "opponent_joined" });
-    send(p2.ws, { type: "opponent_joined" });
-
+    broadcast(roomId, { type: "opponent_joined" });
     room.started = true;
-    broadcast(roomId, { type: "start_game" });
+    broadcast(roomId, { type: "start_game", roomId });
   }
 }
 
-function removePlayer(ws) {
+function leaveRoom(ws) {
   const roomId = ws.roomId;
   if (!roomId) return;
 
@@ -76,24 +74,26 @@ function removePlayer(ws) {
 
   if (room.players.length === 0) {
     rooms.delete(roomId);
-    return;
+  } else {
+    broadcast(roomId, { type: "opponent_left" });
+    room.started = false;
   }
 
-  broadcast(roomId, {
-    type: "error",
-    message: "상대가 나갔습니다."
-  });
-
-  room.started = false;
+  ws.roomId = null;
+  ws.side = null;
 }
 
 wss.on("connection", (ws) => {
-  ws.on("message", (raw) => {
+  ws.roomId = null;
+  ws.side = null;
+
+  send(ws, { type: "connected" });
+
+  ws.on("message", (message) => {
     let data;
     try {
-      data = JSON.parse(raw.toString());
-    } catch {
-      send(ws, { type: "error", message: "잘못된 JSON" });
+      data = JSON.parse(message.toString());
+    } catch (e) {
       return;
     }
 
@@ -102,44 +102,58 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (data.type === "move") {
-      const roomId = data.roomId;
-      const room = rooms.get(roomId);
-      if (!room) {
-        send(ws, { type: "error", message: "룸이 없습니다." });
-        return;
-      }
-
-      const player = room.players.find(p => p.ws === ws);
-      if (!player) {
-        send(ws, { type: "error", message: "룸 참가자가 아닙니다." });
-        return;
-      }
-
-      if (!room.started) {
-        send(ws, { type: "error", message: "게임이 아직 시작되지 않았습니다." });
-        return;
-      }
-
-      broadcast(roomId, {
-        type: "move",
-        fromR: data.fromR,
-        fromC: data.fromC,
-        toR: data.toR,
-        toC: data.toC,
-        promotion: data.promotion || null
-      });
+    if (data.type === "leave_room") {
+      leaveRoom(ws);
       return;
     }
 
-    send(ws, { type: "error", message: "알 수 없는 명령입니다." });
+    if (data.type === "move") {
+      const roomId = ws.roomId;
+      if (!roomId) return;
+
+      const room = rooms.get(roomId);
+      if (!room) return;
+
+      // 현재는 클라이언트 신뢰 방식
+      broadcast(roomId, {
+        type: "move",
+        from: data.from,
+        to: data.to,
+        promotion: data.promotion || null,
+        piece: data.piece || null,
+        turn: data.turn || null
+      });
+
+      return;
+    }
+
+    if (data.type === "sync_state") {
+      const roomId = ws.roomId;
+      if (!roomId) return;
+
+      const room = rooms.get(roomId);
+      if (!room) return;
+
+      room.state = data.state || null;
+      broadcast(roomId, {
+        type: "sync_state",
+        state: room.state
+      });
+
+      return;
+    }
+
+    if (data.type === "chat") {
+      const roomId = ws.roomId;
+      if (!roomId) return;
+      broadcast(roomId, { type: "chat", text: data.text || "" });
+      return;
+    }
   });
 
   ws.on("close", () => {
-    removePlayer(ws);
+    leaveRoom(ws);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+console.log(`WebSocket server running on port ${PORT}`);
