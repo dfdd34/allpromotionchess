@@ -1,44 +1,51 @@
-// ───────── All-Promotion-Chess WebSocket 서버 ─────────
-const WebSocket = require("ws");
-const PORT = process.env.PORT || 3000;
-const wss  = new WebSocket.Server({ port: PORT });
+import WebSocket, { WebSocketServer } from "ws";
 
-/* ── 방/유틸 ─────────────────────────────────────── */
-const ROOMS = new Map();                         // roomId → {clients, state}
-const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const rid   = () => Array.from({length:6},_=>CHARS[Math.random()*CHARS.length|0]).join("");
-const norm  = id=>String(id||"").trim().toUpperCase();
-const send  = (ws,o)=> ws.readyState===1 && ws.send(JSON.stringify(o));
-const cast  = (room,o,ex)=> room.clients.forEach(c=> c!==ex && c.readyState===1 && c.send(JSON.stringify(o)));
+const wss = new WebSocketServer({ port: 8080 });
+const rooms = {};             // roomId -> [ws, ws]
 
-function join(ws, want=""){                      // 방 생성/입장
-  let room = want && ROOMS.get(norm(want));
-  let created=false;
-  if(!room){ created=true; do{ room={roomId:rid(),clients:new Set(),state:null}; }while(ROOMS.has(room.roomId)); ROOMS.set(room.roomId,room);}
-  if(room.clients.size>=2){ send(ws,{type:"room_full"}); return; }
-  room.clients.add(ws); ws.roomId=room.roomId; ws.side= room.clients.size===1?"w":"b";
-  send(ws,{type:"room_joined",roomId:room.roomId,side:ws.side,created,state:room.state});
-  if(room.clients.size===2) cast(room,{type:"start_game"});
-}
-function leave(ws){ const room=ROOMS.get(ws.roomId); if(!room)return;
-  room.clients.delete(ws); cast(room,{type:"opponent_left"},ws);
-  if(!room.clients.size) ROOMS.delete(room.roomId);
+function broadcast(room, obj){
+  rooms[room]?.forEach(c => c.readyState===1 && c.send(JSON.stringify(obj)));
 }
 
-/* ── WS 핸들러 ───────────────────────────────────── */
-wss.on("connection", ws=>{
-  send(ws,{type:"connected"});
-  ws.on("message", raw=>{
-    let m; try{m=JSON.parse(raw);}catch{return;}
-    switch(m.type){
-      case"create_room": join(ws); break;
-      case"join_room"  : join(ws,m.roomId); break;
-      case"sync_state" : { const r=ROOMS.get(ws.roomId); if(!r)break;
-        r.state=m.state; cast(r,{type:"sync_state",state:r.state},ws);} break;
-      case"move"       : { const r=ROOMS.get(ws.roomId); if(!r)break;
-        cast(r,m,ws);} break;
+wss.on("connection", ws => {
+  ws.on("message", raw => {
+    let msg; try{msg=JSON.parse(raw);}catch{return;}
+    const { type, room, fen } = msg;
+
+    if(type==="create"){
+      rooms[room] = [ws];
+      ws.room = room;
+      ws.color = "w";
+    }
+
+    if(type==="join"){
+      if(!rooms[room] || rooms[room].length>=2){
+        ws.send(JSON.stringify({type:"error",msg:"방이 가득 찼습니다"}));
+        return;
+      }
+      rooms[room].push(ws);
+      ws.room = room;
+      ws.color = "b";
+      // 두 플레이어 모두에게 상대 입장 알림
+      broadcast(room,{type:"peer_joined"});
+      // 초기 동기화 (백색이 원본 보드 전송)
+      const white = rooms[room].find(c => c.color==="w");
+      if(white?.lastFen) broadcast(room,{type:"sync_state",fen:white.lastFen,color:"w"});
+    }
+
+    if(type==="sync_state"){
+      ws.lastFen = fen;                 // 직전 FEN 저장
+      broadcast(room,{type:"sync_state",fen,color:ws.color});
     }
   });
-  ws.on("close", ()=>leave(ws));
+
+  ws.on("close", () => {
+    const room = ws.room;
+    if(!room) return;
+    rooms[room] = rooms[room].filter(c => c!==ws);
+    broadcast(room,{type:"peer_left"});
+    if(rooms[room].length===0) delete rooms[room];
+  });
 });
-console.log("♟  WebSocket server on :",PORT);
+
+console.log("WebSocket 서버 실행 중 : ws://localhost:8080");
