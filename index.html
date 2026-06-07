@@ -80,7 +80,7 @@
       text-transform: uppercase;
     }
 
-    #createBtn, #joinBtn, #leaveBtn, #copyBtn {
+    button {
       padding: 12px 14px;
       border-radius: 10px;
       border: none;
@@ -212,7 +212,7 @@
     </div>
 
     <div id="joinPanel">
-      <input id="roomInput" type="text" placeholder="룸코드 입력 (비우면 새 룸)" maxlength="12" />
+      <input id="roomInput" type="text" placeholder="룸코드 입력" maxlength="12" />
       <button id="createBtn">룸 만들기</button>
       <button id="joinBtn">룸 입장</button>
       <button id="copyBtn">룸코드 복사</button>
@@ -373,7 +373,10 @@
         setStatus("먼저 서버에 연결 중이어야 합니다.");
         return;
       }
-      send({ type: "join_room", roomId: mode === "create" ? "" : code });
+      send({
+        type: mode === "create" ? "create_room" : "join_room",
+        roomId: mode === "create" ? "" : code
+      });
     }
 
     function leaveRoom() {
