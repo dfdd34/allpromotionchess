@@ -14,9 +14,7 @@ function send(ws, data) {
 function broadcast(roomId, data) {
   const room = rooms.get(roomId);
   if (!room) return;
-  for (const p of room.players) {
-    send(p.ws, data);
-  }
+  for (const p of room.players) send(p.ws, data);
 }
 
 function normalizeRoomId(roomId) {
@@ -25,24 +23,28 @@ function normalizeRoomId(roomId) {
 }
 
 function makeRoomId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  let id = "";
+  do {
+    id = Math.random().toString(36).slice(2, 8).toUpperCase();
+  } while (rooms.has(id));
+  return id;
 }
 
-function joinRoom(ws, rawRoomId) {
+function createOrJoinRoom(ws, rawRoomId) {
   let roomId = normalizeRoomId(rawRoomId);
-
-  if (!roomId) {
-    roomId = makeRoomId();
-  }
+  if (!roomId) roomId = makeRoomId();
 
   let room = rooms.get(roomId);
+  let created = false;
+
   if (!room) {
     room = {
       players: [],
-      started: false,
-      state: null
+      state: null,
+      started: false
     };
     rooms.set(roomId, room);
+    created = true;
   }
 
   if (room.players.length >= 2) {
@@ -51,7 +53,6 @@ function joinRoom(ws, rawRoomId) {
   }
 
   const side = room.players.length === 0 ? "w" : "b";
-
   room.players.push({ ws, side });
   ws.roomId = roomId;
   ws.side = side;
@@ -60,11 +61,11 @@ function joinRoom(ws, rawRoomId) {
     type: "room_joined",
     roomId,
     side,
-    message: side === "w" ? "새 룸 생성 완료" : "룸에 참가 완료"
+    created,
+    message: created ? "룸 생성 완료" : "룸 입장 완료"
   });
 
   if (room.players.length === 2) {
-    broadcast(roomId, { type: "opponent_joined" });
     room.started = true;
     broadcast(roomId, { type: "start_game", roomId });
   }
@@ -83,7 +84,6 @@ function leaveRoom(ws) {
     rooms.delete(roomId);
   } else {
     broadcast(roomId, { type: "opponent_left" });
-    room.started = false;
   }
 
   ws.roomId = null;
@@ -100,12 +100,17 @@ wss.on("connection", (ws) => {
     let data;
     try {
       data = JSON.parse(message.toString());
-    } catch (e) {
+    } catch {
+      return;
+    }
+
+    if (data.type === "create_room") {
+      createOrJoinRoom(ws, "");
       return;
     }
 
     if (data.type === "join_room") {
-      joinRoom(ws, data.roomId);
+      createOrJoinRoom(ws, data.roomId);
       return;
     }
 
@@ -117,10 +122,6 @@ wss.on("connection", (ws) => {
     if (data.type === "move") {
       const roomId = ws.roomId;
       if (!roomId) return;
-
-      const room = rooms.get(roomId);
-      if (!room) return;
-
       broadcast(roomId, {
         type: "move",
         from: data.from,
@@ -129,14 +130,12 @@ wss.on("connection", (ws) => {
         piece: data.piece || null,
         turn: data.turn || null
       });
-
       return;
     }
 
     if (data.type === "sync_state") {
       const roomId = ws.roomId;
       if (!roomId) return;
-
       const room = rooms.get(roomId);
       if (!room) return;
 
@@ -145,7 +144,6 @@ wss.on("connection", (ws) => {
         type: "sync_state",
         state: room.state
       });
-
       return;
     }
   });
